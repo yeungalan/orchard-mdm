@@ -135,7 +135,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tabs a .count { color: var(--ink-3); font-weight: 500; margin-left: 4px; }
 
 /* ---- key/value ---- */
-dl.kv { display: grid; grid-template-columns: minmax(130px, 34%) 1fr; margin: 0; }
+dl.kv { display: grid; grid-template-columns: minmax(130px, 34%) 1fr; margin: 0; align-content: start; }
 dl.kv dt { color: var(--ink-3); padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 dl.kv dd { margin: 0; padding: 7px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 dl.kv dt:last-of-type, dl.kv dd:last-of-type { border-bottom: 0; }

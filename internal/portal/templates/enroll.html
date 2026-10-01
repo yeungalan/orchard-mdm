@@ -30,6 +30,13 @@
   <p class="lede">Enter the enrollment code from {{.Org}} IT to set up this iPhone or iPad for work.</p>
   {{template "codeform" .}}
 {{end}}
+{{if and .AccountSignIn (not .Error)}}
+<section class="privacy">
+  <h2>{{if .AccountBYOD}}Using your own iPhone or iPad?{{else}}Have a work account?{{end}}</h2>
+  <p>{{if .AccountBYOD}}You can add just your work account instead, which keeps work data separate and private from your personal data.{{end}}
+  Open <strong>Settings → General → VPN &amp; Device Management</strong>, tap <strong>Sign In to Work or School Account</strong>, and enter your work email address.</p>
+</section>
+{{end}}
 {{template "support" .}}
 {{template "foot" .}}
 

@@ -24,7 +24,7 @@ export async function render(ctx) {
       <div><h1>${deviceName(d)}</h1>
         <p class="sub">${modelLabel(d.product_name) || "Unknown model"}${d.os_version ? `, iOS ${d.os_version}` : ""}${d.serial_number ? html`<span class="ident" style="margin-left:12px">${d.serial_number}</span>` : ""}</p>
         <div class="row" style="margin-top:10px">${enrollChip(d.enrollment_status)} ${complianceChip(d.compliance)}
-          ${d.supervised ? html`<span class="chip chip-plain">Supervised</span>` : html`<span class="chip chip-plain">Not supervised</span>`}
+          ${d.user_enrollment ? html`<span class="chip chip-info">User Enrollment</span>` : d.supervised ? html`<span class="chip chip-plain">Supervised</span>` : html`<span class="chip chip-plain">Not supervised</span>`}
           ${d.lost_mode ? html`<span class="chip chip-warn">Lost Mode</span>` : ""}
           <span class="chip chip-plain">${ownershipLabel(d.ownership)}</span>
           ${data.pending_commands ? html`<a class="chip chip-info" href="${base}/commands">${plural(data.pending_commands, "command")} waiting</a>` : ""}</div>
@@ -33,7 +33,7 @@ export async function render(ctx) {
         <button class="btn btn-primary" data-a="command">Send command</button>
         <button class="btn" data-a="sync">Refresh</button>
         <button class="btn" data-a="lock">Lock</button>
-        ${d.lost_mode ? html`<button class="btn" data-a="lostoff">Leave Lost Mode</button>` : html`<button class="btn" data-a="loston">Lost Mode</button>`}
+        ${d.user_enrollment ? "" : d.lost_mode ? html`<button class="btn" data-a="lostoff">Leave Lost Mode</button>` : html`<button class="btn" data-a="loston">Lost Mode</button>`}
         <button class="btn" data-a="more">Manage</button></div>` : ""}
       ${!enrolled && can("manage") ? html`<div class="actions"><button class="btn btn-danger" data-a="forget">Delete record</button></div>` : ""}
     </div>
@@ -50,7 +50,7 @@ export async function render(ctx) {
     } catch (e) { toastError(e); }
   };
   const actions = {
-    command: () => commandDialog([udid], { onDone: reload, supervised: d.supervised }),
+    command: () => commandDialog([udid], { onDone: reload, supervised: d.supervised, userEnrollment: d.user_enrollment }),
     sync: () => action("sync", "Inventory refresh queued. The device reports back within a minute when it's online."),
     lock: () => commandDialog([udid], { only: ["DeviceLock"], preselect: "DeviceLock", onDone: reload }),
     loston: () => commandDialog([udid], { only: ["EnableLostMode"], preselect: "EnableLostMode", onDone: reload, supervised: d.supervised }),
@@ -90,8 +90,10 @@ function manageDialog(udid, d, data, reload, navigate) {
           <dt>Company Portal link</dt><dd><a href="${s.portal_url}" target="_blank" rel="noopener">${s.portal_url}</a></dd></dl>`, actions: [{ id: "c", label: "Close" }] });
         return false;
       }],
-      ["renew", "Renew device identity", `Issue a new identity certificate (current one expires ${fmtDate(d.cert_not_after)}).`, () => run("renew-identity", "Identity renewal sent", ["Renew the identity certificate?", "A fresh enrollment profile is installed silently to replace the device certificate.", "Renew"])],
-      ["unenroll", "Remove management", "Removes the management profile. Managed apps and profiles flagged for removal go with it; personal data stays. This is not a wipe.", () =>
+      ...(d.user_enrollment ? [] : [["renew", "Renew device identity", `Issue a new identity certificate (current one expires ${fmtDate(d.cert_not_after)}).`, () => run("renew-identity", "Identity renewal sent", ["Renew the identity certificate?", "A fresh enrollment profile is installed silently to replace the device certificate.", "Renew"])]]),
+      ["unenroll", "Remove management", d.user_enrollment
+        ? "Removes the work account. iOS deletes only the work apps, accounts and data; personal data is untouched."
+        : "Removes the management profile. Managed apps and profiles flagged for removal go with it; personal data stays. This is not a wipe.", () =>
         run("unenroll", "Unenroll command sent", ["Remove management from this device?", "The device stops being managed. Its personal data stays on it; managed apps, profiles and accounts are removed. You'd need to enroll it again to manage it.", "Remove management"])],
     );
   }
@@ -116,8 +118,11 @@ async function overview(host, d, data, { udid, reload }) {
       <dt>Name</dt><dd>${v(d.device_name)}</dd>
       <dt>Model</dt><dd>${v(modelLabel(d.product_name))}${d.product_name && modelLabel(d.product_name) !== d.product_name ? html` <span class="hint">${d.product_name}</span>` : ""}${d.model ? html` <span class="hint">${d.model}</span>` : ""}</dd>
       <dt>iOS</dt><dd>${v(d.os_version)} ${d.build_version ? html`<span class="hint">(${d.build_version})</span>` : ""}</dd>
-      <dt>Serial number</dt><dd class="ident">${v(d.serial_number)}</dd>
-      <dt>UDID</dt><dd class="ident">${d.udid}</dd>
+      ${d.user_enrollment ? html`<dt>Enrollment ID</dt><dd class="ident">${d.udid}</dd>
+      <dt>Work account</dt><dd>${d.managed_apple_id}</dd>
+      <dt>Device identifiers</dt><dd class="muted">Hidden: personal device enrolled with User Enrollment</dd>`
+      : html`<dt>Serial number</dt><dd class="ident">${v(d.serial_number)}</dd>
+      <dt>UDID</dt><dd class="ident">${d.udid}</dd>${d.managed_apple_id ? html`<dt>Work account</dt><dd>${d.managed_apple_id}</dd>` : ""}`}
       ${d.imei ? html`<dt>IMEI</dt><dd class="ident">${d.imei}</dd>` : ""}
       <dt>Assigned user</dt><dd>${v(d.assigned_user)}${d.assigned_email ? html` <span class="hint">${d.assigned_email}</span>` : ""}</dd>
       <dt>Asset tag</dt><dd>${v(d.asset_tag)}</dd>
@@ -133,20 +138,22 @@ async function overview(host, d, data, { udid, reload }) {
       <dt>Compliance</dt><dd>${complianceChip(d.compliance)}${d.compliance_reasons?.length ? html`<ul style="margin:6px 0 0;padding-left:18px">${d.compliance_reasons.map((r) => html`<li>${r}</li>`)}</ul>` : ""}</dd>
       <dt>Enrolled</dt><dd>${fmtDate(d.enrolled_at)} <span class="hint">${enrollTypeLabel(d.enrollment_type)}${data.enrollment_token ? `: ${data.enrollment_token.name}` : ""}</span></dd>
       <dt>Push</dt><dd>${d.has_push_token ? `Registered, last sent ${ago(d.last_push)}` : "No push token"}</dd>
-      <dt>Location</dt><dd>${loc ? html`<a href="#/devices/${encodeURIComponent(udid)}/location">${(+loc.latitude).toFixed(4)}, ${(+loc.longitude).toFixed(4)}</a> <span class="hint">${ago(d.location_at)}</span>` : html`<span class="muted">Only available in Lost Mode or through the companion app</span>`}</dd>
+      <dt>Location</dt><dd>${d.user_enrollment ? html`<span class="muted">Not shared by personal devices</span>` : loc ? html`<a href="#/devices/${encodeURIComponent(udid)}/location">${(+loc.latitude).toFixed(4)}, ${(+loc.longitude).toFixed(4)}</a> <span class="hint">${ago(d.location_at)}</span>` : html`<span class="muted">Only available in Lost Mode or through the companion app</span>`}</dd>
     </dl></div></section>
     <section class="panel"><div class="panel-head"><h2>Security</h2></div><div class="panel-pad"><dl class="kv">
       <dt>Passcode</dt><dd>${d.passcode_present ? "Set" : "Not set"}${d.passcode_present ? (d.passcode_compliant ? ", meets policy" : ", does not meet policy") : ""}</dd>
       <dt>Data protection</dt><dd>${d.encryption_caps & 2 && d.passcode_present ? "Active" : d.encryption_caps ? "Available (needs a passcode)" : v("")}</dd>
-      <dt>Supervised</dt><dd>${yes(d.supervised)}</dd>
-      <dt>Activation Lock</dt><dd>${d.activation_lock ? "On" : "Off"}${data.has_bypass_code ? html` <span class="hint">bypass code stored</span>` : ""}</dd>
-      <dt>Find My</dt><dd>${d.find_my ? "On" : "Off"}</dd>
-      <dt>Enrolled via ADE</dt><dd>${yes(d.dep_enrolled)}</dd>
-      <dt>Passcode clearable</dt><dd>${data.has_unlock_token ? "Yes (unlock token escrowed)" : "No"}</dd>
+      ${d.user_enrollment ? "" : html`<dt>Supervised</dt><dd>${yes(d.supervised)}</dd>`}
+      ${d.user_enrollment ? "" : html`<dt>Activation Lock</dt><dd>${d.activation_lock ? "On" : "Off"}${data.has_bypass_code ? html` <span class="hint">bypass code stored</span>` : ""}</dd>
+      <dt>Find My</dt><dd>${d.find_my ? "On" : "Off"}</dd>`}
+      ${d.user_enrollment ? "" : html`<dt>Enrolled via ADE</dt><dd>${yes(d.dep_enrolled)}</dd>
+      <dt>Passcode clearable</dt><dd>${data.has_unlock_token ? "Yes (unlock token escrowed)" : "No"}</dd>`}
       <dt>Identity certificate</dt><dd>expires ${fmtDate(d.cert_not_after)}</dd>
       ${sec.PasscodeLockGracePeriodEnforced !== undefined ? html`<dt>Lock grace period</dt><dd>${sec.PasscodeLockGracePeriodEnforced} s</dd>` : ""}
     </dl></div></section>
-    <section class="panel"><div class="panel-head"><h2>Network</h2></div><div class="panel-pad"><dl class="kv">
+    <section class="panel"><div class="panel-head"><h2>Network</h2></div><div class="panel-pad">${d.user_enrollment ? html`<dl class="kv">
+      <dt>Public IP</dt><dd class="ident">${v(d.last_ip)}</dd></dl>
+      <p class="hint">Wi-Fi, carrier, phone number and hardware addresses aren't collected from personal devices.</p>` : html`<dl class="kv">
       <dt>Public IP</dt><dd class="ident">${v(d.last_ip)}</dd>
       <dt>Wi-Fi network</dt><dd>${d.ssid ? html`${d.ssid} <span class="hint ident">${d.bssid}</span>` : html`<span class="muted">Reported by the companion app only</span>`}</dd>
       <dt>Wi-Fi MAC</dt><dd class="ident">${v(d.wifi_mac)}</dd>
@@ -155,7 +162,7 @@ async function overview(host, d, data, { udid, reload }) {
       <dt>Phone number</dt><dd>${v(d.phone_number)}</dd>
       <dt>Roaming</dt><dd>${d.roaming ? "Roaming now" : "No"}${info.DataRoamingEnabled !== undefined ? html` <span class="hint">data roaming ${info.DataRoamingEnabled ? "allowed" : "off"}</span>` : ""}</dd>
       <dt>Personal Hotspot</dt><dd>${d.hotspot ? "On" : "Off"}</dd>
-    </dl></div></section>
+    </dl>`}</div></section>
   </div>
   ${d.os_updates?.length ? html`<section class="panel" style="margin-top:16px"><div class="panel-head"><h2>Available updates</h2>${can("act") ? html`<button class="btn btn-sm" id="upd">Update iOS</button>` : ""}</div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Update</th><th>Version</th><th>Build</th><th>Restart</th></tr></thead><tbody>
@@ -229,6 +236,10 @@ async function location(host, d, data, { udid, reload }) {
         </tbody></table></div></section></div>`
       : emptyState("No location recorded", d.supervised ? "Enable Lost Mode to locate this device." : "This device isn't supervised, so MDM can't request its location.")}`.s;
   const cmd = (id) => commandDialog([udid], { only: [id], preselect: id, onDone: reload, supervised: d.supervised });
+  if (d.user_enrollment) {
+    host.innerHTML = emptyState("Location isn't available", "This is a personal device enrolled with User Enrollment. iOS never shares its location with the organization.").s;
+    return;
+  }
   $("#loston", host)?.addEventListener("click", () => cmd("EnableLostMode"));
   $("#lostoff", host)?.addEventListener("click", () => cmd("DisableLostMode"));
   $("#locate", host)?.addEventListener("click", async () => {

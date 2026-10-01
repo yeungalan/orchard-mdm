@@ -25,6 +25,7 @@ import (
 	"github.com/smallstep/pkcs7"
 	"github.com/smallstep/scep"
 	"github.com/smallstep/scep/x509util"
+	"github.com/yeungalan/orchard-mdm/internal/mdm"
 	"github.com/yeungalan/orchard-mdm/internal/pki"
 	"howett.net/plist"
 )
@@ -62,6 +63,20 @@ type Device struct {
 	ddmFetched  []string
 	Log         []string
 	signMessage bool
+
+	// UserEnrollment is set when the device enrolled through account-driven
+	// User Enrollment (BYOD); it then identifies itself with an EnrollmentID
+	// and hides device identifiers.
+	UserEnrollment bool
+	EnrollmentMode string
+	ManagedAppleID string
+}
+
+func (d *Device) idKey() string {
+	if d.UserEnrollment {
+		return "EnrollmentID"
+	}
+	return "UDID"
 }
 
 // New returns a device with random identifiers.
@@ -177,6 +192,21 @@ func (d *Device) Enroll(profile []byte) error {
 	if ar, ok := mdmPayload["AccessRights"].(uint64); ok && ar&8 != 0 {
 		return errors.New("profile grants the device erase right")
 	}
+	d.EnrollmentMode, _ = mdmPayload["EnrollmentMode"].(string)
+	d.ManagedAppleID, _ = mdmPayload["AssignedManagedAppleID"].(string)
+	if d.EnrollmentMode != "" && d.ManagedAppleID == "" {
+		return errors.New("account-driven profile lacks AssignedManagedAppleID")
+	}
+	if d.EnrollmentMode == "BYOD" {
+		// iOS cancels a User Enrollment whose MDM payload declares AccessRights
+		if _, ok := mdmPayload["AccessRights"]; ok {
+			return errors.New("User Enrollment profile must not contain AccessRights")
+		}
+		d.UserEnrollment = true
+		d.UDID = "UE-" + strings.ToUpper(pki.RandomToken(12))
+		d.IMEI, d.Phone, d.Serial = "", "", ""
+		d.Supervised = false // user-enrolled devices are never supervised
+	}
 	d.checkInURL, _ = mdmPayload["CheckInURL"].(string)
 	d.serverURL, _ = mdmPayload["ServerURL"].(string)
 	d.topic, _ = mdmPayload["Topic"].(string)
@@ -185,10 +215,14 @@ func (d *Device) Enroll(profile []byte) error {
 	if err := d.scepEnroll(scepPayload); err != nil {
 		return fmt.Errorf("scep: %w", err)
 	}
-	if _, err := d.checkin(map[string]any{
-		"MessageType": "Authenticate", "UDID": d.UDID, "Topic": d.topic, "SerialNumber": d.Serial, "DeviceName": d.Name,
-		"ProductName": d.ProductName, "Model": "MTP03J/A", "ModelName": d.ModelName, "OSVersion": d.OSVersion, "BuildVersion": d.BuildVersion, "IMEI": d.IMEI,
-	}); err != nil {
+	auth := map[string]any{
+		"MessageType": "Authenticate", d.idKey(): d.UDID, "Topic": d.topic, "DeviceName": d.Name,
+		"ProductName": d.ProductName, "Model": "MTP03J/A", "ModelName": d.ModelName, "OSVersion": d.OSVersion, "BuildVersion": d.BuildVersion,
+	}
+	if !d.UserEnrollment {
+		auth["SerialNumber"], auth["IMEI"] = d.Serial, d.IMEI
+	}
+	if _, err := d.checkin(auth); err != nil {
 		return fmt.Errorf("authenticate: %w", err)
 	}
 	d.pushToken = make([]byte, 32)
@@ -196,10 +230,14 @@ func (d *Device) Enroll(profile []byte) error {
 	d.pushMagic = pki.NewUUID()
 	unlock := make([]byte, 64)
 	_, _ = rand.Read(unlock)
-	if _, err := d.checkin(map[string]any{
-		"MessageType": "TokenUpdate", "UDID": d.UDID, "Topic": d.topic, "Token": d.pushToken, "PushMagic": d.pushMagic, "UnlockToken": unlock,
+	tu := map[string]any{
+		"MessageType": "TokenUpdate", d.idKey(): d.UDID, "Topic": d.topic, "Token": d.pushToken, "PushMagic": d.pushMagic, "UnlockToken": unlock,
 		"AwaitingConfiguration": false,
-	}); err != nil {
+	}
+	if d.UserEnrollment {
+		delete(tu, "UnlockToken") // no unlock token escrow in User Enrollment
+	}
+	if _, err := d.checkin(tu); err != nil {
 		return fmt.Errorf("token update: %w", err)
 	}
 	d.mu.Lock()
@@ -314,7 +352,7 @@ func (d *Device) checkin(msg map[string]any) ([]byte, error) {
 
 // Unenroll simulates the user removing the management profile.
 func (d *Device) Unenroll() error {
-	_, err := d.checkin(map[string]any{"MessageType": "CheckOut", "UDID": d.UDID, "Topic": d.topic})
+	_, err := d.checkin(map[string]any{"MessageType": "CheckOut", d.idKey(): d.UDID, "Topic": d.topic})
 	d.mu.Lock()
 	d.enrolled = false
 	d.mu.Unlock()
@@ -325,7 +363,7 @@ func (d *Device) Unenroll() error {
 // empty. It returns the request types handled.
 func (d *Device) Poll() ([]string, error) {
 	var handled []string
-	report := map[string]any{"UDID": d.UDID, "Status": "Idle"}
+	report := map[string]any{d.idKey(): d.UDID, "Status": "Idle"}
 	for i := 0; i < 500; i++ {
 		body, _ := plist.Marshal(report, plist.XMLFormat)
 		resp, err := d.signedRequest(d.serverURL, body)
@@ -351,7 +389,7 @@ func (d *Device) Poll() ([]string, error) {
 		handled = append(handled, rt)
 		d.logf("command %s", rt)
 		report = d.handle(rt, cmd.Command)
-		report["UDID"] = d.UDID
+		report[d.idKey()] = d.UDID
 		report["CommandUUID"] = cmd.CommandUUID
 		if !d.Enrolled() {
 			return handled, nil
@@ -375,6 +413,9 @@ func errorReport(desc string) map[string]any {
 func (d *Device) handle(rt string, c map[string]any) map[string]any {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.UserEnrollment && !mdm.AllowedOnUserEnrollment(rt) {
+		return errorReport("The MDM command " + rt + " is not allowed for user enrollment")
+	}
 	switch rt {
 	case "DeviceInformation":
 		d.Battery -= 0.01 + mrand.Float64()*0.03
@@ -388,6 +429,11 @@ func (d *Device) handle(rt string, c map[string]any) map[string]any {
 			"WiFiMAC": d.WiFiMAC, "BluetoothMAC": d.WiFiMAC, "PhoneNumber": d.Phone, "CurrentCarrierNetwork": d.Carrier, "CellularTechnology": 1,
 			"IsRoaming": false, "PersonalHotspotEnabled": false, "IsMDMLostModeEnabled": d.lostMode, "DataRoamingEnabled": false, "VoiceRoamingEnabled": true,
 			"Languages": []any{"en-JP", "ja-JP"}, "TimeZone": "Asia/Tokyo",
+		}
+		if d.UserEnrollment {
+			for _, k := range []string{"UDID", "SerialNumber", "IMEI", "PhoneNumber", "WiFiMAC", "BluetoothMAC", "CurrentCarrierNetwork", "IsActivationLockEnabled"} {
+				delete(all, k)
+			}
 		}
 		resp := map[string]any{}
 		queries, _ := c["Queries"].([]any)
@@ -404,7 +450,11 @@ func (d *Device) handle(rt string, c map[string]any) map[string]any {
 			"PasscodeCompliantWithProfiles": d.PasscodePresent, "ManagementStatus": map[string]any{"EnrolledViaDEP": false, "IsUserEnrollment": false}}})
 	case "InstalledApplicationList":
 		var list []any
+		managedOnly := d.UserEnrollment || c["ManagedAppsOnly"] == true
 		for _, a := range d.apps {
+			if managedOnly && !a.Managed {
+				continue
+			}
 			list = append(list, map[string]any{"Identifier": a.Identifier, "Name": a.Name, "Version": a.Version, "ShortVersion": a.Version, "BundleSize": 50_000_000})
 		}
 		return ack(map[string]any{"InstalledApplicationList": list})
@@ -517,7 +567,7 @@ func (d *Device) handle(rt string, c map[string]any) map[string]any {
 }
 
 func (d *Device) ddm(endpoint string, data []byte) ([]byte, error) {
-	msg := map[string]any{"MessageType": "DeclarativeManagement", "UDID": d.UDID, "Endpoint": endpoint}
+	msg := map[string]any{"MessageType": "DeclarativeManagement", d.idKey(): d.UDID, "Endpoint": endpoint}
 	if data != nil {
 		msg["Data"] = data
 	}

@@ -428,3 +428,26 @@ func (s *Service) EnrollHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/x-apple-aspen-config")
 	_, _ = w.Write(prof)
 }
+
+// AssignServiceDiscovery points Apple Business Manager's account-driven
+// enrollment service discovery at this server.
+func (s *Service) AssignServiceDiscovery(ctx context.Context, id int64) (string, error) {
+	srv, err := s.store.GetDEPServer(id)
+	if err != nil {
+		return "", err
+	}
+	c, err := s.client(srv)
+	if err != nil {
+		return "", err
+	}
+	base := s.mdm.PublicURL()
+	if base == "" {
+		return "", mdm.ErrNoPublicURL
+	}
+	u := base + "/.well-known/com.apple.remotemanagement"
+	if err := c.AssignServiceDiscovery(ctx, u); err != nil {
+		return "", err
+	}
+	_ = s.store.SetSetting(fmt.Sprintf("ade_service_discovery_%d", id), u)
+	return u, nil
+}

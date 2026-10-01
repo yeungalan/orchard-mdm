@@ -177,6 +177,7 @@ func (a *App) jobVPPSync(ctx context.Context) {
 // jobMaintenance prunes old data and warns about expiring certificates.
 func (a *App) jobMaintenance(context.Context) {
 	a.Store.CleanupExpired()
+	a.Store.PruneAccountEnrollments(7 * 86400)
 	day := int64(86400)
 	if n := a.MDM.SettingInt(mdm.SettingCommandExpiryDays); n > 0 {
 		if c, _ := a.Store.ExpireCommands(int64(n) * day); c > 0 {

@@ -34,6 +34,8 @@ type Schema struct {
 	Unique      bool    `json:"unique"`
 	Supervised  bool    `json:"supervised,omitempty"`
 	Fields      []Field `json:"fields"`
+	// UserEnrollment is false for payloads personal (User Enrollment) devices reject.
+	UserEnrollment bool `json:"user_enrollment"`
 }
 
 func b(key, label string, def bool, supervised bool, section string) Field {
@@ -513,4 +515,31 @@ func SchemaByType(t string) (*Schema, bool) {
 		}
 	}
 	return nil, false
+}
+
+// userEnrollmentForbidden lists payload types iOS rejects on User Enrollment
+// (personal) devices, from Apple's device-management schema.
+var userEnrollmentForbidden = map[string]bool{
+	"com.apple.cellular": true, "com.apple.homescreenlayout": true, "com.apple.notificationsettings": true, "com.apple.proxy.http.global": true,
+	"com.apple.shareddeviceconfiguration": true, "com.apple.app.lock": true, "com.apple.dnsSettings.managed": true, "com.apple.domains": true,
+	"com.apple.networkusagerules": true, "com.apple.vpn.managed": true, "com.apple.apn.managed": true, "com.apple.SetupAssistant.managed": true,
+	"com.apple.profileRemovalPassword": true, "com.apple.tvremote": true, "com.apple.osxserver.account": true, "com.apple.cellularprivatenetwork.managed": true,
+}
+
+// UnsupportedOnUserEnrollment returns the payload types that personal devices
+// enrolled with User Enrollment won't accept.
+func UnsupportedOnUserEnrollment(types []string) []string {
+	var out []string
+	for _, t := range types {
+		if userEnrollmentForbidden[t] {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func init() {
+	for i := range Schemas {
+		Schemas[i].UserEnrollment = !userEnrollmentForbidden[Schemas[i].Type]
+	}
 }

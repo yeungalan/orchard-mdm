@@ -31,7 +31,18 @@ type EnrollmentOptions struct {
 	Ref string
 	// ChallengeTTL is how long the embedded SCEP challenge stays valid.
 	ChallengeTTL time.Duration
+	// Mode is "" for a classic device enrollment, or the account-driven
+	// EnrollmentMode: "BYOD" (User Enrollment) or "ADDE" (device enrollment).
+	Mode string
+	// ManagedAppleID is the Managed Apple Account of an account-driven enrollment.
+	ManagedAppleID string
 }
+
+// Account-driven enrollment modes.
+const (
+	ModeBYOD = "BYOD"
+	ModeADDE = "ADDE"
+)
 
 // EnrollmentProfile builds a (signed when possible) enrollment profile.
 func (s *Service) EnrollmentProfile(o EnrollmentOptions) ([]byte, error) {
@@ -56,6 +67,12 @@ func (s *Service) EnrollmentProfile(o EnrollmentOptions) ([]byte, error) {
 	if err := s.store.CreateChallenge(challenge, "enroll", o.Ref, int64(o.ChallengeTTL.Seconds())); err != nil {
 		return nil, err
 	}
+	if o.Mode != "" && o.Mode != ModeBYOD && o.Mode != ModeADDE {
+		return nil, fmt.Errorf("unknown enrollment mode %q", o.Mode)
+	}
+	if o.Mode != "" && o.ManagedAppleID == "" {
+		return nil, errors.New("account-driven enrollment needs a Managed Apple Account")
+	}
 	org := s.Setting(SettingOrgName)
 	ident := s.MDMIdentifier()
 	scepUUID := pki.NewUUID()
@@ -71,6 +88,34 @@ func (s *Service) EnrollmentProfile(o EnrollmentOptions) ([]byte, error) {
 			"PayloadCertificateFileName": c.Subject.CommonName + ".cer",
 			"PayloadContent":             c.Raw,
 		})
+	}
+	mdmPayload := map[string]any{
+		"PayloadType":             "com.apple.mdm",
+		"PayloadIdentifier":       ident + ".mdm",
+		"PayloadUUID":             pki.NewUUID(),
+		"PayloadVersion":          1,
+		"PayloadDisplayName":      org + " Device Management",
+		"PayloadDescription":      "Allows " + org + " to manage this device.",
+		"IdentityCertificateUUID": scepUUID,
+		"Topic":                   topic,
+		"ServerURL":               base + "/mdm/connect",
+		"CheckInURL":              base + "/mdm/checkin",
+		"CheckOutWhenRemoved":     true,
+		"SignMessage":             true,
+		"AccessRights":            AccessRights,
+		"ServerCapabilities":      []string{"com.apple.mdm.per-user-connections", "com.apple.mdm.bootstraptoken"},
+	}
+	description := "Enrolls this device in " + org + " mobile device management."
+	if o.Mode != "" {
+		mdmPayload["EnrollmentMode"] = o.Mode
+		mdmPayload["AssignedManagedAppleID"] = o.ManagedAppleID
+	}
+	if o.Mode == ModeBYOD {
+		// User Enrollment has a fixed, privacy-preserving set of rights
+		// (which never includes erase); iOS rejects profiles that declare AccessRights.
+		delete(mdmPayload, "AccessRights")
+		mdmPayload["PayloadDescription"] = "Allows " + org + " to manage work apps, accounts and data on this device. Your personal data stays private."
+		description = "Adds your " + org + " work account to this device. " + org + " can manage only the work apps and data it provides."
 	}
 	content = append(content,
 		map[string]any{
@@ -90,22 +135,7 @@ func (s *Service) EnrollmentProfile(o EnrollmentOptions) ([]byte, error) {
 				"Key Usage": 5,
 			},
 		},
-		map[string]any{
-			"PayloadType":             "com.apple.mdm",
-			"PayloadIdentifier":       ident + ".mdm",
-			"PayloadUUID":             pki.NewUUID(),
-			"PayloadVersion":          1,
-			"PayloadDisplayName":      org + " Device Management",
-			"PayloadDescription":      "Allows " + org + " to manage this device.",
-			"IdentityCertificateUUID": scepUUID,
-			"Topic":                   topic,
-			"ServerURL":               base + "/mdm/connect",
-			"CheckInURL":              base + "/mdm/checkin",
-			"CheckOutWhenRemoved":     true,
-			"SignMessage":             true,
-			"AccessRights":            AccessRights,
-			"ServerCapabilities":      []string{"com.apple.mdm.per-user-connections", "com.apple.mdm.bootstraptoken"},
-		},
+		mdmPayload,
 	)
 	profile := map[string]any{
 		"PayloadType":         "Configuration",
@@ -113,7 +143,7 @@ func (s *Service) EnrollmentProfile(o EnrollmentOptions) ([]byte, error) {
 		"PayloadIdentifier":   ident,
 		"PayloadUUID":         pki.NewUUID(),
 		"PayloadDisplayName":  org + " Enrollment",
-		"PayloadDescription":  "Enrolls this device in " + org + " mobile device management.",
+		"PayloadDescription":  description,
 		"PayloadOrganization": org,
 		"PayloadScope":        "System",
 		"PayloadContent":      content,
@@ -173,6 +203,9 @@ func (s *Service) ProfileForDevice(p *store.Profile, d *store.Device) ([]byte, e
 // RenewIdentity sends a fresh enrollment profile so the device obtains a new
 // identity certificate without re-enrolling.
 func (s *Service) RenewIdentity(udid string, meta Meta) (*store.Command, error) {
+	if d, err := s.store.GetDevice(udid); err == nil && d.UserEnrollment {
+		return nil, errors.New("personal devices renew their identity when the person removes and re-adds their work account")
+	}
 	prof, err := s.EnrollmentProfile(EnrollmentOptions{Ref: "renew:" + udid, ChallengeTTL: 7 * 24 * time.Hour})
 	if err != nil {
 		return nil, err

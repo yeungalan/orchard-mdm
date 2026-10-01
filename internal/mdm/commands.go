@@ -136,7 +136,10 @@ type Spec struct {
 	Supervised  bool    `json:"supervised,omitempty"`
 	Confirm     bool    `json:"confirm,omitempty"`
 	Bulk        bool    `json:"bulk"`
-	build       func(c *BuildContext, p Params) (map[string]any, error)
+	// UserEnrollment is true when the command works on personal devices
+	// enrolled with User Enrollment.
+	UserEnrollment bool `json:"user_enrollment"`
+	build          func(c *BuildContext, p Params) (map[string]any, error)
 }
 
 func req(rt string) map[string]any { return map[string]any{"RequestType": rt} }
@@ -644,6 +647,15 @@ var catalogIndex = func() map[string]*Spec {
 	m := map[string]*Spec{}
 	for _, s := range Catalog {
 		m[s.ID] = s
+		switch {
+		case s.ID == "Custom":
+			s.UserEnrollment = true // checked against the actual RequestType
+		case s.RequestType == "Settings":
+			// only managed-app settings apply to user enrollments; device settings don't
+			s.UserEnrollment = false
+		default:
+			s.UserEnrollment = AllowedOnUserEnrollment(s.RequestType)
+		}
 	}
 	return m
 }()
@@ -735,12 +747,29 @@ func (s *Service) BuildCommand(specID string, d *store.Device, p Params) (map[st
 	if p == nil {
 		p = Params{}
 	}
+	if d != nil && d.UserEnrollment && !spec.UserEnrollment {
+		return nil, spec, ErrNotOnUserEnrollment
+	}
 	cmd, err := spec.build(&BuildContext{Service: s, Device: d}, p)
 	if err != nil {
 		return nil, spec, err
 	}
-	if rt, _ := cmd["RequestType"].(string); IsDenied(rt) {
+	rt, _ := cmd["RequestType"].(string)
+	if IsDenied(rt) {
 		return nil, spec, ErrForbiddenCommand
+	}
+	if d != nil && d.UserEnrollment {
+		if !AllowedOnUserEnrollment(rt) {
+			return nil, spec, ErrNotOnUserEnrollment
+		}
+		switch rt {
+		case "DeviceInformation":
+			cmd["Queries"] = UserEnrollmentQueries
+		}
+	}
+	if d != nil && rt == "InstalledApplicationList" && (d.UserEnrollment || d.Ownership == "personal") {
+		// personal devices: only report the apps the organization manages
+		cmd["ManagedAppsOnly"] = true
 	}
 	return cmd, spec, nil
 }

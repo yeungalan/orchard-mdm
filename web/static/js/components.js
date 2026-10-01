@@ -54,9 +54,10 @@ async function readParams(form, spec) {
 }
 
 /** Opens the command picker for one or more devices. */
-export async function commandDialog(udids, { only, preselect, onDone, supervised } = {}) {
+export async function commandDialog(udids, { only, preselect, onDone, supervised, userEnrollment } = {}) {
   const cat = await catalog();
   let specs = cat.items;
+  if (userEnrollment) specs = specs.filter((s) => s.user_enrollment);
   if (udids.length > 1) specs = specs.filter((s) => s.bulk);
   if (only) specs = specs.filter((s) => only.includes(s.id));
   const refs = { apps: [], profiles: [] };
@@ -67,6 +68,7 @@ export async function commandDialog(udids, { only, preselect, onDone, supervised
   const bulk = udids.length > 1;
   let current = null;
   const listView = () => html`<p class="hint">${bulk ? `Send a command to ${plural(udids.length, "device")}.` : "Choose what to send to this device."} Commands are queued and delivered the next time the device checks in.</p>
+    ${userEnrollment ? html`<p class="hint">This is a personal device enrolled with User Enrollment, so only commands that act on work apps and data are listed.</p>` : ""}
     ${cat.categories.map((c) => {
       const items = specs.filter((s) => s.category === c);
       if (!items.length) return "";

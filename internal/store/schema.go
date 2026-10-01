@@ -527,4 +527,31 @@ CREATE INDEX events_ts ON events(ts);
 INSERT INTO groups(name, description, kind, rules, created_at, updated_at)
 VALUES ('All Devices', 'Every enrolled device. Built in; cannot be deleted.', 'all', '', strftime('%s','now'), strftime('%s','now'))
 `,
+	// 2: account-driven enrollment (BYOD User Enrollment and account-driven device enrollment)
+	`
+ALTER TABLE devices ADD COLUMN managed_apple_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE devices ADD COLUMN user_enrollment INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE devices ADD COLUMN account_enrollment_id INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX devices_managed_apple_id ON devices(managed_apple_id);
+
+CREATE TABLE account_enrollments (
+	id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+	token_hash          TEXT NOT NULL UNIQUE,
+	mode                TEXT NOT NULL,
+	user_identifier     TEXT NOT NULL,
+	managed_apple_id    TEXT NOT NULL,
+	display_name        TEXT NOT NULL DEFAULT '',
+	auth_method         TEXT NOT NULL DEFAULT '',
+	enrollment_token_id INTEGER NOT NULL DEFAULT 0,
+	group_ids           TEXT NOT NULL DEFAULT '',
+	product             TEXT NOT NULL DEFAULT '',
+	os_build            TEXT NOT NULL DEFAULT '',
+	device_id           TEXT NOT NULL DEFAULT '',
+	ip                  TEXT NOT NULL DEFAULT '',
+	created_at          INTEGER NOT NULL,
+	expires_at          INTEGER NOT NULL,
+	profile_issued_at   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX account_enrollments_created ON account_enrollments(created_at)
+`,
 }

@@ -46,6 +46,8 @@ type DeviceSummary struct {
 	Location          map[string]any `json:"location,omitempty"`
 	PendingCommands   int            `json:"pending_commands"`
 	ComplianceReasons []string       `json:"compliance_reasons"`
+	UserEnrollment    bool           `json:"user_enrollment"`
+	ManagedAppleID    string         `json:"managed_apple_id"`
 }
 
 func summarize(d *store.Device) DeviceSummary {
@@ -55,6 +57,7 @@ func summarize(d *store.Device) DeviceSummary {
 		BatteryLevel: d.BatteryLevel, CapacityGB: d.CapacityGB, AvailableGB: d.AvailableGB, LastSeen: d.LastSeen, EnrolledAt: d.EnrolledAt,
 		AssignedUser: d.AssignedUser, Tags: d.Tags, LostMode: d.LostMode, Carrier: d.Carrier, SSID: d.SSID, LastIP: d.LastIP,
 		PasscodePresent: d.PasscodePresent, HasPushToken: d.HasPushToken, Location: d.Location, ComplianceReasons: d.ComplianceReasons,
+		UserEnrollment: d.UserEnrollment, ManagedAppleID: d.ManagedAppleID,
 	}
 }
 
@@ -62,7 +65,7 @@ func filterFromQuery(r *http.Request) store.DeviceFilter {
 	q := r.URL.Query()
 	f := store.DeviceFilter{
 		Query: q.Get("q"), Status: q.Get("status"), Compliance: q.Get("compliance"), Model: q.Get("model"), OSVersion: q.Get("os"),
-		Ownership: q.Get("ownership"), Supervised: q.Get("supervised"), Sort: q.Get("sort"), Desc: q.Get("dir") == "desc",
+		Ownership: q.Get("ownership"), EnrollmentType: q.Get("enrollment_type"), Supervised: q.Get("supervised"), Sort: q.Get("sort"), Desc: q.Get("dir") == "desc",
 		Limit: queryInt(r, "limit", 50), Offset: queryInt(r, "offset", 0),
 	}
 	if g := queryInt(r, "group", 0); g > 0 {
@@ -106,7 +109,7 @@ func (a *API) exportDevices(w http.ResponseWriter, r *http.Request, p *Principal
 	cw := csv.NewWriter(w)
 	_ = cw.Write([]string{"udid", "serial_number", "device_name", "product_name", "os_version", "build", "status", "enrollment_type", "ownership", "supervised",
 		"compliance", "battery_percent", "capacity_gb", "available_gb", "imei", "phone_number", "carrier", "wifi_mac", "last_ip", "ssid",
-		"assigned_user", "assigned_email", "asset_tag", "tags", "lost_mode", "latitude", "longitude", "enrolled_at", "last_seen"})
+		"assigned_user", "assigned_email", "asset_tag", "tags", "lost_mode", "latitude", "longitude", "enrolled_at", "last_seen", "managed_apple_id"})
 	ts := func(v int64) string {
 		if v == 0 {
 			return ""
@@ -124,7 +127,7 @@ func (a *API) exportDevices(w http.ResponseWriter, r *http.Request, p *Principal
 		}
 		_ = cw.Write([]string{d.UDID, d.SerialNumber, d.DeviceName, d.ProductName, d.OSVersion, d.BuildVersion, d.EnrollmentStatus, d.EnrollmentType, d.Ownership,
 			fmt.Sprint(d.Supervised), d.Compliance, battery, fmt.Sprintf("%.1f", d.CapacityGB), fmt.Sprintf("%.1f", d.AvailableGB), d.IMEI, d.PhoneNumber, d.Carrier,
-			d.WiFiMAC, d.LastIP, d.SSID, d.AssignedUser, d.AssignedEmail, d.AssetTag, strings.Join(d.Tags, ";"), fmt.Sprint(d.LostMode), lat, lon, ts(d.EnrolledAt), ts(d.LastSeen)})
+			d.WiFiMAC, d.LastIP, d.SSID, d.AssignedUser, d.AssignedEmail, d.AssetTag, strings.Join(d.Tags, ";"), fmt.Sprint(d.LostMode), lat, lon, ts(d.EnrolledAt), ts(d.LastSeen), d.ManagedAppleID})
 	}
 	cw.Flush()
 	return nil
@@ -479,6 +482,9 @@ func (a *API) runAction(ctx context.Context, udid, action string, p *Principal) 
 		}
 		return map[string]string{"command_uuid": c.UUID}, nil
 	case "renew-identity":
+		if d.UserEnrollment {
+			return nil, badRequest("personal devices renew their identity when the person removes and re-adds their work account")
+		}
 		c, err := a.MDM.RenewIdentity(udid, meta)
 		if err != nil {
 			return nil, err
@@ -510,6 +516,9 @@ func (a *API) runAction(ctx context.Context, udid, action string, p *Principal) 
 		n, err := a.Store.CancelDeviceCommands(udid)
 		return map[string]int64{"canceled": n}, err
 	case "locate":
+		if d.UserEnrollment {
+			return nil, badRequest("personal devices enrolled with User Enrollment can't be located")
+		}
 		if !d.LostMode {
 			return nil, badRequest("location is only available while the device is in Lost Mode (supervised devices)")
 		}

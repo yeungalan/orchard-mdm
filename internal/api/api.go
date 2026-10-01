@@ -331,6 +331,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	a.handle(mux, "PUT /api/enrollment/tokens/{id}", PermManage, a.updateEnrollmentToken)
 	a.handle(mux, "DELETE /api/enrollment/tokens/{id}", PermManage, a.deleteEnrollmentToken)
 	a.handle(mux, "GET /api/enrollment/profile", PermManage, a.downloadEnrollmentProfile)
+	a.handle(mux, "GET /api/enrollment/account", PermRead, a.accountEnrollment)
+	a.handle(mux, "PUT /api/enrollment/account", PermAdmin, a.putAccountEnrollment)
 
 	// automated device enrollment
 	a.handle(mux, "GET /api/ade/servers", PermRead, a.listADEServers)
@@ -340,6 +342,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	a.handle(mux, "GET /api/ade/servers/{id}/publickey", PermAdmin, a.adePublicKey)
 	a.handle(mux, "POST /api/ade/servers/{id}/token", PermAdmin, a.adeUploadToken)
 	a.handle(mux, "POST /api/ade/servers/{id}/sync", PermManage, a.adeSync)
+	a.handle(mux, "POST /api/ade/servers/{id}/service-discovery", PermAdmin, a.adeServiceDiscovery)
 	a.handle(mux, "GET /api/ade/devices", PermRead, a.listADEDevices)
 	a.handle(mux, "GET /api/ade/profiles", PermRead, a.listADEProfiles)
 	a.handle(mux, "POST /api/ade/profiles", PermManage, a.createADEProfile)

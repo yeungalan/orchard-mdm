@@ -141,7 +141,7 @@ curl -H 'Authorization: Bearer orch_xxxxxxxx_…' https://mdm.example.com/api/de
 | `GET` | `/api/compliance/summary` | read |
 | `POST` | `/api/compliance/evaluate` | operator |
 
-## Enrollment
+## Enrollment (links and work account sign-in)
 
 | Method | Path | Minimum role |
 |---|---|---|
@@ -151,6 +151,8 @@ curl -H 'Authorization: Bearer orch_xxxxxxxx_…' https://mdm.example.com/api/de
 | `PUT` | `/api/enrollment/tokens/{id}` | operator |
 | `DELETE` | `/api/enrollment/tokens/{id}` | operator |
 | `GET` | `/api/enrollment/profile` | operator |
+| `GET` | `/api/enrollment/account` | read |
+| `PUT` | `/api/enrollment/account` | admin |
 
 ## Automated Device Enrollment
 
@@ -163,6 +165,7 @@ curl -H 'Authorization: Bearer orch_xxxxxxxx_…' https://mdm.example.com/api/de
 | `GET` | `/api/ade/servers/{id}/publickey` | admin |
 | `POST` | `/api/ade/servers/{id}/token` | admin |
 | `POST` | `/api/ade/servers/{id}/sync` | operator |
+| `POST` | `/api/ade/servers/{id}/service-discovery` | admin |
 | `GET` | `/api/ade/devices` | read |
 | `GET` | `/api/ade/profiles` | read |
 | `POST` | `/api/ade/profiles` | operator |
@@ -223,3 +226,5 @@ curl -H 'Authorization: Bearer orch_xxxxxxxx_…' https://mdm.example.com/api/de
 - `POST /api/devices/bulk` takes `udids` plus either `command`/`params`, an `action`, `add_to_group`/`remove_from_group` with `group_id`, or `add_tags` with `tags`.
 - `GET /api/devices/{udid}/telemetry?hours=168` returns battery/storage/network samples and the networks seen; `GET /api/devices/{udid}/locations?days=30` returns location fixes.
 - Uploads (profiles, certificates, tokens) are sent as base64 in JSON (`{"data": "…"}`); enterprise `.ipa` files use `multipart/form-data` with a `file` field.
+- `PUT /api/enrollment/account` configures work account sign-in: `{"enabled", "mode": "byod"|"adde", "domains": [...], "auth": "code"|"sso"|"both", "group_ids": [...], "oidc_issuer", "oidc_client_id", "oidc_client_secret", "oidc_identity_claim", "oidc_require_match"}`. The client secret is write-only.
+- Devices enrolled with User Enrollment have `"user_enrollment": true` and a `managed_apple_id`; commands iOS doesn't accept on them return `400`.

@@ -67,3 +67,8 @@ h2 { font-size: 18px; margin: 32px 0 10px; font-weight: 700; }
 .support h2 { margin-top: 0; }
 .foot { text-align: center; color: var(--ink-3); font-size: 13px; padding: 18px 20px max(18px, env(safe-area-inset-bottom)); }
 @media (max-width: 420px) { .facts { grid-template-columns: 1fr 1fr; } }
+.privacy { margin-top: 30px; padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.privacy h2 { margin-top: 0; }
+.privacy ul { margin: 0; padding-left: 20px; color: var(--ink-2); }
+.privacy li { margin-bottom: 6px; }
+.privacy p { color: var(--ink-2); margin-bottom: 0; }

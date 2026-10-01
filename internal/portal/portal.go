@@ -69,6 +69,7 @@ func Register(mux *http.ServeMux, d Deps) {
 	mux.HandleFunc("GET /files/apps/{id}/{secret}/manifest.plist", p.appManifest)
 	mux.HandleFunc("GET /files/apps/{id}/{secret}/app.ipa", p.appIPA)
 	mux.HandleFunc("GET /ca.pem", p.caPEM)
+	p.registerAccount(mux)
 }
 
 func ago(ts int64) string {
@@ -88,22 +89,24 @@ func ago(ts int64) string {
 }
 
 type page struct {
-	Org          string
-	Title        string
-	Support      map[string]string
-	Error        string
-	Notice       string
-	Token        string
-	TokenName    string
-	ProfileURL   string
-	QRURL        string
-	EnrollURL    string
-	IsAppleMob   bool
-	RequireToken bool
-	Ready        bool
-	Device       *store.Device
-	Apps         []portalApp
-	Reasons      []string
+	Org           string
+	Title         string
+	Support       map[string]string
+	Error         string
+	Notice        string
+	Token         string
+	TokenName     string
+	ProfileURL    string
+	QRURL         string
+	EnrollURL     string
+	IsAppleMob    bool
+	RequireToken  bool
+	AccountSignIn bool
+	AccountBYOD   bool
+	Ready         bool
+	Device        *store.Device
+	Apps          []portalApp
+	Reasons       []string
 }
 
 type portalApp struct {
@@ -123,8 +126,10 @@ func (p *portal) base(r *http.Request, title string) *page {
 		Support: map[string]string{
 			"email": p.MDM.Setting(mdm.SettingSupportEmail), "phone": p.MDM.Setting(mdm.SettingSupportPhone), "url": p.MDM.Setting(mdm.SettingSupportURL),
 		},
-		IsAppleMob:   strings.Contains(ua, "iPhone") || strings.Contains(ua, "iPad") || (strings.Contains(ua, "Macintosh") && strings.Contains(ua, "Mobile")),
-		RequireToken: p.MDM.SettingBool(mdm.SettingEnrollRequireToken),
+		IsAppleMob:    strings.Contains(ua, "iPhone") || strings.Contains(ua, "iPad") || (strings.Contains(ua, "Macintosh") && strings.Contains(ua, "Mobile")),
+		RequireToken:  p.MDM.SettingBool(mdm.SettingEnrollRequireToken),
+		AccountSignIn: p.Store.GetSettingBool(SettingAccountEnabled, false),
+		AccountBYOD:   p.Store.GetSetting(SettingAccountMode, "byod") != "adde",
 	}
 }
 

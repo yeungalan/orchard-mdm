@@ -47,6 +47,11 @@ func (s *Service) HandleCheckin(w http.ResponseWriter, r *http.Request) {
 	}
 	mt := asString(msg["MessageType"])
 	udid := deviceID(msg)
+	if udid == "" && asString(msg["EnrollmentUserID"]) != "" {
+		// user channel of a user enrollment: Orchard manages the device channel only
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if udid == "" {
 		http.Error(w, "missing UDID", http.StatusBadRequest)
 		return
@@ -143,13 +148,16 @@ func (s *Service) authenticate(udid string, msg map[string]any, cert *x509.Certi
 		return s.store.UpdateDevice(udid, map[string]any{"cert_fingerprint": fp, "cert_not_after": cert.NotAfter.Unix(), "last_seen": store.Now()})
 	}
 	fields := map[string]any{
-		"enrollment_status": "pending",
-		"push_token":        "",
-		"push_magic":        "",
-		"cert_fingerprint":  fp,
-		"cert_not_after":    cert.NotAfter.Unix(),
-		"ddm_token":         "",
-		"last_seen":         store.Now(),
+		"user_enrollment":       false,
+		"managed_apple_id":      "",
+		"account_enrollment_id": 0,
+		"enrollment_status":     "pending",
+		"push_token":            "",
+		"push_magic":            "",
+		"cert_fingerprint":      fp,
+		"cert_not_after":        cert.NotAfter.Unix(),
+		"ddm_token":             "",
+		"last_seen":             store.Now(),
 	}
 	for key, col := range map[string]string{
 		"SerialNumber": "serial_number", "IMEI": "imei", "MEID": "meid", "DeviceName": "device_name", "Model": "model",
@@ -178,8 +186,39 @@ func (s *Service) authenticate(udid string, msg map[string]any, cert *x509.Certi
 		fields["dep_enrolled"] = true
 		fields["ownership"] = "corporate"
 		fields["enrollment_token_id"] = 0
+	case strings.HasPrefix(ref, "account:"):
+		id, _ := strconv.ParseInt(strings.TrimPrefix(ref, "account:"), 10, 64)
+		a, err := s.store.GetAccountEnrollment(id)
+		if err != nil {
+			return fmt.Errorf("account enrollment %d not found", id)
+		}
+		byod := a.Mode == "byod"
+		fields["enrollment_type"] = a.Mode
+		fields["user_enrollment"] = byod
+		fields["managed_apple_id"] = a.ManagedAppleID
+		fields["account_enrollment_id"] = a.ID
+		fields["enrollment_token_id"] = a.EnrollmentTokenID
+		fields["dep_enrolled"] = false
+		fields["assigned_email"] = a.ManagedAppleID
+		if a.DisplayName != "" {
+			fields["assigned_user"] = a.DisplayName
+		}
+		if byod {
+			fields["ownership"] = "personal"
+		} else {
+			fields["ownership"] = "corporate"
+		}
+		if a.EnrollmentTokenID > 0 && !byod {
+			if t, err := s.store.GetEnrollmentToken(a.EnrollmentTokenID); err == nil && t.Ownership != "" {
+				fields["ownership"] = t.Ownership
+			}
+		}
+		s.store.SetAccountEnrollmentDevice(a.ID, udid)
 	case strings.HasPrefix(ref, "renew:"):
 		// identity renewal profile re-installed; keep the original enrollment metadata
+		for _, k := range []string{"user_enrollment", "managed_apple_id", "account_enrollment_id"} {
+			delete(fields, k)
+		}
 	default:
 		fields["enrollment_type"] = "manual"
 		fields["enrollment_token_id"] = 0
@@ -198,8 +237,8 @@ func (s *Service) authenticate(udid string, msg map[string]any, cert *x509.Certi
 }
 
 func (s *Service) tokenUpdate(d *store.Device, msg map[string]any) error {
-	if asString(msg["UserID"]) != "" || asString(msg["UserShortName"]) != "" {
-		// user channel (Shared iPad / macOS); Orchard manages the device channel only
+	if asString(msg["UserID"]) != "" || asString(msg["UserShortName"]) != "" || asString(msg["EnrollmentUserID"]) != "" {
+		// user channel (Shared iPad / macOS / user enrollment); Orchard manages the device channel only
 		s.log.Debug("ignoring user-channel TokenUpdate", "udid", d.UDID)
 		return nil
 	}
@@ -234,6 +273,11 @@ func (s *Service) tokenUpdate(d *store.Device, msg map[string]any) error {
 	}
 	// enrollment completed
 	var groupIDs []int64
+	if d.AccountEnrollmentID > 0 {
+		if a, err := s.store.GetAccountEnrollment(d.AccountEnrollmentID); err == nil {
+			groupIDs = append(groupIDs, a.GroupIDs...)
+		}
+	}
 	if d.EnrollmentTokenID > 0 {
 		if t, err := s.store.GetEnrollmentToken(d.EnrollmentTokenID); err == nil {
 			groupIDs = append(groupIDs, t.GroupIDs...)
@@ -262,6 +306,7 @@ func (s *Service) tokenUpdate(d *store.Device, msg map[string]any) error {
 	s.bus.Publish(events.DeviceEnrolled, d.UDID, map[string]any{
 		"serial_number": d.SerialNumber, "device_name": d.DeviceName, "product_name": d.ProductName, "os_version": d.OSVersion,
 		"enrollment_type": d.EnrollmentType, "awaiting_configuration": fields["awaiting_configuration"],
+		"user_enrollment": d.UserEnrollment, "managed_apple_id": d.ManagedAppleID,
 	})
 	s.Push(d.UDID)
 	return nil
@@ -307,8 +352,11 @@ func (s *Service) QueueInventory(udid, reason string) int {
 	if err != nil || (d.EnrollmentStatus != "enrolled" && d.EnrollmentStatus != "pending") {
 		return 0
 	}
-	types := []string{"DeviceInformation", "SecurityInfo", "InstalledApplicationList", "ManagedApplicationList", "ProfileList", "CertificateList", "Restrictions", "ProvisioningProfileList"}
-	if d.Supervised {
+	types := []string{"DeviceInformation", "SecurityInfo", "InstalledApplicationList", "ManagedApplicationList", "ProfileList", "CertificateList", "ProvisioningProfileList"}
+	if !d.UserEnrollment {
+		types = append(types, "Restrictions")
+	}
+	if d.Supervised && !d.UserEnrollment {
 		types = append(types, "AvailableOSUpdates")
 	}
 	n := 0
@@ -332,6 +380,10 @@ func (s *Service) QueueTelemetry(udid string) bool {
 	if s.store.HasPendingCommand(udid, "DeviceInformation", "") {
 		return false
 	}
-	_, err := s.Enqueue(udid, map[string]any{"RequestType": "DeviceInformation", "Queries": TelemetryQueries}, Meta{Source: "system", Ref: "telemetry"})
+	queries := TelemetryQueries
+	if d, err := s.store.GetDevice(udid); err == nil && d.UserEnrollment {
+		queries = UserEnrollmentTelemetryQueries
+	}
+	_, err := s.Enqueue(udid, map[string]any{"RequestType": "DeviceInformation", "Queries": queries}, Meta{Source: "system", Ref: "telemetry"})
 	return err == nil
 }

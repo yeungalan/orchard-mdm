@@ -1,0 +1,34 @@
+{{template "head" .}}
+{{if .BYOD}}
+  <h1>Add your work account</h1>
+  <p class="lede">Signing in lets {{.Org}} set up work apps, email and Wi-Fi on this device. Work data is kept separate from your personal data.</p>
+{{else}}
+  <h1>Enroll this device</h1>
+  <p class="lede">Signing in enrolls this device in {{.Org}} device management.</p>
+{{end}}
+{{if .UserIdentifier}}<p class="meta">Work account <span class="ident">{{.UserIdentifier}}</span></p>{{end}}
+{{if .Error}}<p class="callout callout-bad" role="alert">{{.Error}}</p>{{end}}
+{{if .AllowSSO}}
+  <p><a class="button" href="{{.SSOURL}}">Sign in with your organization account</a></p>
+{{end}}
+{{if .AllowCode}}
+  {{if .AllowSSO}}<h2>Or use an enrollment code</h2>{{end}}
+  <form class="codeform" method="post" action="/enroll/account/{{.Mode}}/auth">
+    <input type="hidden" name="user-identifier" value="{{.UserIdentifier}}">
+    <label for="code">Enrollment code from {{.Org}} IT</label>
+    <input id="code" name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" required>
+    <button class="button" type="submit">Continue</button>
+  </form>
+{{end}}
+{{if .BYOD}}
+<section class="privacy">
+  <h2>What {{.Org}} can and can't see</h2>
+  <ul>
+    <li><strong>Can</strong> manage the work apps, accounts, settings and data it gives you, and see your device model, iOS version, battery and storage.</li>
+    <li><strong>Can't</strong> see your personal apps, photos, messages, browsing history, phone number, serial number or location.</li>
+    <li><strong>Can't</strong> erase your device. Removing the work account later deletes only the work data.</li>
+  </ul>
+</section>
+{{end}}
+{{template "support" .}}
+{{template "foot" .}}

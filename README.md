@@ -14,6 +14,10 @@ console and REST API.
 
 **Enrollment**
 - Enrollment links with QR codes. Each link sets ownership, assigned user, groups, a use limit and an expiry
+- **BYOD with User Enrollment:** people add their work account in Settings ("Sign In to Work or School Account").
+  Work data stays in a separate volume, and personal apps, data, identifiers and location stay private. Sign-in uses an enrollment code or
+  single sign-on (OpenID Connect: Entra ID, Google, Okta…). Service discovery runs via your domain's well-known file or Apple Business Manager.
+  Account-driven *device* enrollment for organization-owned devices is also supported ([guide](docs/byod.md))
 - Automated Device Enrollment through Apple Business Manager / Apple School Manager: token upload,
   device sync, Setup Assistant profiles (skip screens, supervision, mandatory enrollment, await configuration) and automatic profile assignment
 - SCEP-issued device identities with one-time challenges, request signing (`Mdm-Signature`) and identity renewal
@@ -66,6 +70,8 @@ console and REST API.
 | Device configuration: assignments, compliance and Declarative Management status | Battery, storage and network history |
 | ![Last known position and location history](docs/images/location.png) | ![Profile builder editing a Wi-Fi payload](docs/images/profile.png) |
 | Location (Lost Mode or companion app) | Profile builder |
+| ![A personal iPad enrolled with User Enrollment: work account shown, device identifiers hidden](docs/images/byod-device.jpg) | <img src="docs/images/byod-signin.jpg" width="300" alt="Work account sign-in page explaining what the organization can and can't see"> |
+| BYOD device enrolled with User Enrollment | Work account sign-in, as people see it in Settings |
 
 <p align="center"><img src="docs/images/portal.jpg" width="300" alt="Company Portal on a phone: device status, compliance reasons and optional apps"><br>Company Portal, as users see it on their device</p>
 
@@ -80,6 +86,8 @@ Orchard was built without device wipe, and enforces that in several places:
   failed passcodes. It is also stripped (with a warning) from uploaded profiles.
 - Compliance actions stop at a remote lock. "Remove management" only removes the MDM profile and the managed
   apps and profiles; the user's data stays on the device.
+- BYOD User Enrollments get Apple's fixed rights for personal devices, which never include erase. Removing the work
+  account deletes only the separate work volume.
 
 ## Requirements
 
@@ -187,7 +195,7 @@ internal/dep         Automated Device Enrollment (OAuth 1 session, sync, profile
 internal/vpp         Apps and Books client and license sync
 internal/profiles    payload schemas, profile builder and upload parser
 internal/api         REST API, sessions, API keys, roles, audit
-internal/portal      enrollment pages, Company Portal, companion-agent API, app downloads
+internal/portal      enrollment pages, work account sign-in (account-driven enrollment, OIDC), Company Portal, companion-agent API, app downloads
 internal/store       SQLite persistence (modernc.org/sqlite, no CGO)
 web/                 the console (vanilla JS modules, embedded)
 ```
@@ -198,15 +206,18 @@ web/                 the console (vanilla JS modules, embedded)
 go test ./...                 # unit tests and end-to-end flows with simulated devices
 go run ./cmd/orchard -url http://127.0.0.1:8080 -admin-user admin -admin-password 'change-me-now'
 go run ./cmd/orchard-sim -enroll http://127.0.0.1:8080/enroll/<token> -n 10
+# BYOD: enroll through work account sign-in (turn it on under Enrollment first)
+go run ./cmd/orchard-sim -server http://127.0.0.1:8080 -account sam@acme.example -code <enrollment code> -n 2
 ```
 
 The end-to-end tests enroll simulated devices through real SCEP, sign every request like iOS does, and drive inventory,
-commands, Lost Mode location, profile and app assignment, Declarative Management, compliance, ADE (against a fake Apple API)
-and the full REST API.
+commands, Lost Mode location, profile and app assignment, Declarative Management, compliance, ADE (against a fake Apple API),
+BYOD account-driven User Enrollment (enrollment code and single sign-on against a fake OpenID Connect provider) and the full REST API.
 
 ## Limitations
 
-- Targets iPhone and iPad device enrollment. macOS, tvOS, account-driven User Enrollment and Shared iPad user channels are not managed.
+- Targets iPhone and iPad (device enrollment and BYOD User Enrollment). macOS, tvOS and Shared iPad user channels are not managed.
+- BYOD User Enrollment needs Managed Apple Accounts (federated or created in Apple Business Manager).
 - The connected Wi-Fi network and continuous location are not available through MDM. Use the
   [companion app approach](docs/companion-app.md), with your users' consent.
 - Simulated devices in `orchard-sim` cannot receive real push notifications; they poll instead.

@@ -142,6 +142,7 @@ export function commandChip(status) {
 const STATE = {
   installed: ["good", "Installed"], pending: ["info", "Queued"], installing: ["info", "Installing"], failed: ["bad", "Failed"],
   missing: ["warn", "Missing on device"], removing: ["info", "Removing"], removed: ["unknown", "Removed"], remove_failed: ["bad", "Removal failed"],
+  skipped: ["unknown", "Not applicable"],
 };
 export function stateChip(status) {
   if (!status || status === "—") return html`<span class="muted">—</span>`;
@@ -163,7 +164,7 @@ const MODELS = {
 export const modelLabel = (id) => (id && MODELS[id]) || id || "";
 export const deviceName = (d) => d.device_name || d.product_name || d.serial_number || d.udid;
 export const ownershipLabel = (o) => ({ corporate: "Corporate", personal: "Personal", unknown: "Unknown" })[o] || o;
-export const enrollTypeLabel = (t) => ({ ade: "Automated (ADE)", token: "Enrollment link", manual: "Manual profile" })[t] || t;
+export const enrollTypeLabel = (t) => ({ ade: "Automated (ADE)", token: "Enrollment link", manual: "Manual profile", byod: "User Enrollment (BYOD)", adde: "Work account sign-in" })[t] || t;
 
 // ---------- toasts ----------
 export function toast(msg, kind = "ok") {

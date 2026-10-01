@@ -132,7 +132,7 @@ function payloadCard(p, i, schema, state) {
   return html`<article class="payload-card" data-pi="${i}">
     <header><h3>${schema.name}</h3><input type="text" data-display="${i}" value="${p.display_name || ""}" placeholder="Display name (optional)" style="max-width:260px" aria-label="Payload display name">
       ${can("manage") ? html`<button type="button" class="btn btn-ghost btn-sm" data-rmpayload="${i}">Remove</button>` : ""}</header>
-    <div class="pc-body">${schema.description ? html`<p class="hint" style="margin-top:0">${schema.description}${schema.supervised ? " Supervised devices only." : ""}</p>` : ""}
+    <div class="pc-body">${schema.description ? html`<p class="hint" style="margin-top:0">${schema.description}${schema.supervised ? " Supervised devices only." : !schema.user_enrollment ? " Not supported on personal devices enrolled with User Enrollment." : ""}</p>` : ""}
       ${sections.map((s) => html`${s.name ? html`<div class="section-label">${s.name}</div>` : ""}<div class="inline-fields">${s.fields.map((f) => html`<div data-fkey="${f.key}" ${!showIfOK(f, p.values, schema) ? raw('style="display:none"') : ""}>${fieldControl(f, p.values[f.key], `${i}|${f.key}`, state)}</div>`)}</div>`)}
     </div></article>`;
 }
@@ -241,7 +241,7 @@ async function editor({ root, params, navigate, refresh }) {
     const cats = [...new Set(sch.items.map((s) => s.category))];
     const ctl = modal({ title: "Add payload", wide: true, body: html`${cats.map((c) => html`<div class="section-label">${c}</div><div class="picker">${sch.items.filter((s) => s.category === c).map((s) => {
       const taken = s.unique && state.payloads.some((p) => p.type === s.type);
-      return html`<button type="button" data-type="${s.type}" ${taken ? "disabled" : ""}>${s.name}${s.supervised ? html`<span class="sup">supervised</span>` : ""}<small>${taken ? "Already in this profile" : s.description || short(s.type)}</small></button>`;
+      return html`<button type="button" data-type="${s.type}" ${taken ? "disabled" : ""}>${s.name}${s.supervised ? html`<span class="sup">supervised</span>` : ""}${!s.user_enrollment && !s.supervised ? html`<span class="sup">not on personal devices</span>` : ""}<small>${taken ? "Already in this profile" : s.description || short(s.type)}</small></button>`;
     })}</div>`)}`, actions: [{ id: "c", label: "Cancel" }] });
     ctl.el.addEventListener("click", (e) => {
       const b = e.target.closest("[data-type]");

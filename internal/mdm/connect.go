@@ -26,6 +26,10 @@ func (s *Service) HandleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	udid := deviceID(msg)
 	status := asString(msg["Status"])
+	if udid == "" && asString(msg["EnrollmentUserID"]) != "" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	cert, err := s.requestCert(r, body)
 	if err == nil {
 		err = s.verifyIdentity(cert)
@@ -49,7 +53,7 @@ func (s *Service) HandleConnect(w http.ResponseWriter, r *http.Request) {
 	s.store.TouchDevice(udid)
 	s.recordConnection(d, ClientIP(r, s.trustProxy))
 
-	if asString(msg["UserID"]) != "" || asString(msg["UserShortName"]) != "" {
+	if asString(msg["UserID"]) != "" || asString(msg["UserShortName"]) != "" || asString(msg["EnrollmentUserID"]) != "" {
 		// user channel: Orchard sends no user-scoped commands
 		w.WriteHeader(http.StatusOK)
 		return

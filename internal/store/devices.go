@@ -84,6 +84,9 @@ type Device struct {
 	Hotspot               bool           `json:"hotspot"`
 	AgentToken            string         `json:"-"`
 	AgentLastSeen         int64          `json:"agent_last_seen"`
+	ManagedAppleID        string         `json:"managed_apple_id"`
+	UserEnrollment        bool           `json:"user_enrollment"`
+	AccountEnrollmentID   int64          `json:"account_enrollment_id"`
 	TelemetryAt           int64          `json:"telemetry_at"`
 	CreatedAt             int64          `json:"created_at"`
 	UpdatedAt             int64          `json:"updated_at"`
@@ -100,11 +103,11 @@ const deviceCols = `udid, serial_number, imei, meid, device_name, model, model_n
 	compliance, compliance_reasons, noncompliant_since, portal_token, tags, notes, assigned_user, assigned_email, asset_tag, activation_lock_bypass,
 	location_json, location_at, info_json, security_json, restrictions_json, os_updates_json, os_update_status_json, provisioning_json, media_json,
 	ddm_status_json, ddm_token, ddm_last_status, last_ip, ssid, bssid, local_ip, battery_state, battery_health, cellular_technology, roaming, hotspot,
-	agent_token, agent_last_seen, telemetry_at, created_at, updated_at`
+	agent_token, agent_last_seen, telemetry_at, managed_apple_id, user_enrollment, account_enrollment_id, created_at, updated_at`
 
 func scanDevice(r scanner) (*Device, error) {
 	d := &Device{}
-	var supervised, dep, awaiting, alock, findmy, pp, pc, lost, roaming, hotspot int
+	var supervised, dep, awaiting, alock, findmy, pp, pc, lost, roaming, hotspot, ue int
 	var reasons, tags, loc, info, sec, restr, osu, osus, prov, media, ddm string
 	err := r.Scan(&d.UDID, &d.SerialNumber, &d.IMEI, &d.MEID, &d.DeviceName, &d.Model, &d.ModelName, &d.ProductName, &d.OSVersion, &d.BuildVersion,
 		&d.EnrollmentStatus, &d.EnrollmentType, &d.Ownership, &d.EnrollmentTokenID, &d.EnrolledAt, &d.UnenrolledAt, &d.LastSeen, &d.LastInventory, &d.LastPush,
@@ -114,13 +117,13 @@ func scanDevice(r scanner) (*Device, error) {
 		&d.Compliance, &reasons, &d.NoncompliantSince, &d.PortalToken, &tags, &d.Notes, &d.AssignedUser, &d.AssignedEmail, &d.AssetTag, &d.ActivationLockBypass,
 		&loc, &d.LocationAt, &info, &sec, &restr, &osu, &osus, &prov, &media,
 		&ddm, &d.DDMToken, &d.DDMLastStatus, &d.LastIP, &d.SSID, &d.BSSID, &d.LocalIP, &d.BatteryState, &d.BatteryHealth, &d.CellularTechnology, &roaming, &hotspot,
-		&d.AgentToken, &d.AgentLastSeen, &d.TelemetryAt, &d.CreatedAt, &d.UpdatedAt)
+		&d.AgentToken, &d.AgentLastSeen, &d.TelemetryAt, &d.ManagedAppleID, &ue, &d.AccountEnrollmentID, &d.CreatedAt, &d.UpdatedAt)
 	if err != nil {
 		return nil, notFound(err)
 	}
 	d.Supervised, d.DEPEnrolled, d.AwaitingConfiguration = supervised == 1, dep == 1, awaiting == 1
 	d.ActivationLock, d.FindMy, d.PasscodePresent, d.PasscodeCompliant, d.LostMode = alock == 1, findmy == 1, pp == 1, pc == 1, lost == 1
-	d.Roaming, d.Hotspot = roaming == 1, hotspot == 1
+	d.Roaming, d.Hotspot, d.UserEnrollment = roaming == 1, hotspot == 1, ue == 1
 	d.ComplianceReasons = unmarshalJSON[[]string](reasons)
 	d.Tags = splitTags(tags)
 	d.Location = unmarshalJSON[map[string]any](loc)
@@ -283,19 +286,20 @@ func (s *Store) DeleteDevice(udid string) error {
 
 // DeviceFilter narrows ListDevices.
 type DeviceFilter struct {
-	Query      string
-	Status     string // enrolled|unenrolled|pending|"" (any)
-	Compliance string
-	GroupID    int64
-	Model      string
-	OSVersion  string
-	Ownership  string
-	Supervised string // "1" / "0" / ""
-	UDIDs      []string
-	Sort       string
-	Desc       bool
-	Limit      int
-	Offset     int
+	Query          string
+	Status         string // enrolled|unenrolled|pending|"" (any)
+	Compliance     string
+	GroupID        int64
+	Model          string
+	OSVersion      string
+	Ownership      string
+	EnrollmentType string
+	Supervised     string // "1" / "0" / ""
+	UDIDs          []string
+	Sort           string
+	Desc           bool
+	Limit          int
+	Offset         int
 }
 
 var deviceSortable = map[string]string{
@@ -309,8 +313,8 @@ func (s *Store) ListDevices(f DeviceFilter) ([]*Device, int, error) {
 	var args []any
 	if q := strings.TrimSpace(f.Query); q != "" {
 		like := "%" + q + "%"
-		where = append(where, `(device_name LIKE ? OR serial_number LIKE ? OR udid LIKE ? OR product_name LIKE ? OR model_name LIKE ? OR assigned_user LIKE ? OR assigned_email LIKE ? OR imei LIKE ? OR phone_number LIKE ? OR tags LIKE ? OR asset_tag LIKE ?)`)
-		for i := 0; i < 11; i++ {
+		where = append(where, `(device_name LIKE ? OR serial_number LIKE ? OR udid LIKE ? OR product_name LIKE ? OR model_name LIKE ? OR assigned_user LIKE ? OR assigned_email LIKE ? OR imei LIKE ? OR phone_number LIKE ? OR tags LIKE ? OR asset_tag LIKE ? OR managed_apple_id LIKE ?)`)
+		for i := 0; i < 12; i++ {
 			args = append(args, like)
 		}
 	}
@@ -333,6 +337,10 @@ func (s *Store) ListDevices(f DeviceFilter) ([]*Device, int, error) {
 	if f.OSVersion != "" {
 		where = append(where, `os_version LIKE ?`)
 		args = append(args, f.OSVersion+"%")
+	}
+	if f.EnrollmentType != "" {
+		where = append(where, `enrollment_type=?`)
+		args = append(args, f.EnrollmentType)
 	}
 	if f.Ownership != "" {
 		where = append(where, `ownership=?`)

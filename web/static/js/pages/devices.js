@@ -6,7 +6,7 @@ const PAGE = 50;
 export async function render({ root, query, navigate }) {
   const f = {
     q: query.get("q") || "", status: query.get("status") === "any" ? "" : query.get("status") || "enrolled", compliance: query.get("compliance") || "", model: query.get("model") || "",
-    os: query.get("os") || "", ownership: query.get("ownership") || "", supervised: query.get("supervised") || "", group: query.get("group") || "",
+    os: query.get("os") || "", ownership: query.get("ownership") || "", enrollment_type: query.get("enrollment_type") || "", supervised: query.get("supervised") || "", group: query.get("group") || "",
     sort: query.get("sort") || "", dir: query.get("dir") || "", offset: Number(query.get("offset") || 0),
   };
   const [facets, gs] = await Promise.all([api.get("/api/devices/facets"), groups()]);
@@ -21,6 +21,7 @@ export async function render({ root, query, navigate }) {
       <select id="f-model" aria-label="Model"><option value="">Any model</option>${(facets.models || []).map((m) => html`<option ${f.model === m ? "selected" : ""}>${m}</option>`)}</select>
       <select id="f-os" aria-label="iOS version"><option value="">Any iOS</option>${(facets.os_versions || []).map((m) => html`<option ${f.os === m ? "selected" : ""}>${m}</option>`)}</select>
       <select id="f-ownership" aria-label="Ownership"><option value="">Any ownership</option>${[["corporate", "Corporate"], ["personal", "Personal"], ["unknown", "Unknown"]].map(([v, l]) => html`<option value="${v}" ${f.ownership === v ? "selected" : ""}>${l}</option>`)}</select>
+      <select id="f-enrollment_type" aria-label="Enrollment type"><option value="">Any enrollment</option>${[["byod", "User Enrollment (BYOD)"], ["adde", "Work account sign-in"], ["ade", "Automated (ADE)"], ["token", "Enrollment link"], ["manual", "Manual profile"]].map(([v, l]) => html`<option value="${v}" ${f.enrollment_type === v ? "selected" : ""}>${l}</option>`)}</select>
       <select id="f-supervised" aria-label="Supervision"><option value="">Supervised or not</option><option value="1" ${f.supervised === "1" ? "selected" : ""}>Supervised</option><option value="0" ${f.supervised === "0" ? "selected" : ""}>Not supervised</option></select>
       <select id="f-group" aria-label="Group"><option value="">Any group</option>${gs.map((g) => html`<option value="${g.id}" ${String(g.id) === f.group ? "selected" : ""}>${g.name}</option>`)}</select>
     </div>
@@ -48,9 +49,9 @@ export async function render({ root, query, navigate }) {
       <thead><tr>${can("act") ? html`<th class="sel"><input type="checkbox" id="sel-all" aria-label="Select all on this page"></th>` : ""}${th("name", "Device")}${th("user", "User")}${th("os", "iOS")}<th>Status</th>${th("compliance", "Compliance")}${th("battery", "Battery", "num")}<th class="num">Free</th>${th("last_seen", "Last seen")}</tr></thead>
       <tbody>${res.items.map((d) => html`<tr data-udid="${d.udid}">
         ${can("act") ? html`<td class="sel"><input type="checkbox" value="${d.udid}" aria-label="Select ${deviceName(d)}" ${selected.has(d.udid) ? "checked" : ""}></td>` : ""}
-        <td><a class="primary" href="#/devices/${encodeURIComponent(d.udid)}">${deviceName(d)}</a><span class="cell-sub">${modelLabel(d.product_name) || "Unknown model"}<span class="ident">${d.serial_number}</span></span></td>
+        <td><a class="primary" href="#/devices/${encodeURIComponent(d.udid)}">${deviceName(d)}</a><span class="cell-sub">${modelLabel(d.product_name) || "Unknown model"}${d.user_enrollment ? html`<span style="margin-left:10px">${d.managed_apple_id}</span>` : html`<span class="ident">${d.serial_number}</span>`}</span></td>
         <td>${d.assigned_user || html`<span class="muted">—</span>`}${d.tags.length ? html`<span class="cell-sub">${d.tags.map((t) => html`<span class="tag">${t}</span>`)}</span>` : ""}</td>
-        <td class="nowrap">${d.os_version || "—"}${d.supervised ? html`<span class="cell-sub">Supervised</span>` : ""}</td>
+        <td class="nowrap">${d.os_version || "—"}${d.user_enrollment ? html`<span class="cell-sub">User Enrollment</span>` : d.supervised ? html`<span class="cell-sub">Supervised</span>` : ""}</td>
         <td>${d.lost_mode ? html`<span class="chip chip-warn">Lost Mode</span>` : enrollChip(d.enrollment_status)}${d.pending_commands ? html`<span class="cell-sub">${plural(d.pending_commands, "command")} waiting</span>` : ""}</td>
         <td>${complianceChip(d.compliance)}</td>
         <td class="num">${pct(d.battery_level)}</td>
@@ -104,7 +105,7 @@ export async function render({ root, query, navigate }) {
   };
 
   $("#q", root).addEventListener("input", debounce((e) => { f.q = e.target.value; f.offset = 0; sync(); load(); }, 300));
-  for (const k of ["status", "compliance", "model", "os", "ownership", "supervised", "group"]) {
+  for (const k of ["status", "compliance", "model", "os", "ownership", "enrollment_type", "supervised", "group"]) {
     $("#f-" + k, root).addEventListener("change", (e) => { f[k] = e.target.value; f.offset = 0; sync(); load(); });
   }
   $("#export", root).addEventListener("click", () => api.download("GET", "/api/devices/export.csv" + qsParams({ ...f, offset: "" }), undefined, "devices.csv").catch(toastError));

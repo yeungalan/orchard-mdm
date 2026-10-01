@@ -221,3 +221,31 @@ func (c *Client) Assignments(ctx context.Context, serial string) ([]Assignment, 
 	err := c.do(ctx, http.MethodGet, "/assignments?serialNumber="+serial, nil, &out)
 	return out.Assignments, err
 }
+
+// User is an Apps and Books user (user-based licensing).
+type User struct {
+	ClientUserID   string `json:"clientUserId"`
+	Email          string `json:"email,omitempty"`
+	ManagedAppleID string `json:"managedAppleId,omitempty"`
+}
+
+// CreateUsers registers users for user-based assignment. Creating an existing
+// user is reported as an error by Apple and can be ignored.
+func (c *Client) CreateUsers(ctx context.Context, users []User) (*EventResponse, error) {
+	var out EventResponse
+	err := c.do(ctx, http.MethodPost, "/users/create", map[string]any{"users": users}, &out)
+	return &out, err
+}
+
+// AssociateUsers assigns licenses for an asset to users (clientUserIds).
+func (c *Client) AssociateUsers(ctx context.Context, adamID, pricing string, clientUserIDs []string) (*EventResponse, error) {
+	if pricing == "" {
+		pricing = "STDQ"
+	}
+	var out EventResponse
+	err := c.do(ctx, http.MethodPost, "/assets/associate", map[string]any{
+		"assets":        []map[string]string{{"adamId": adamID, "pricingParam": pricing}},
+		"clientUserIds": clientUserIDs,
+	}, &out)
+	return &out, err
+}

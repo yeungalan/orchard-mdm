@@ -363,3 +363,10 @@ func (c *Client) DeviceDetails(ctx context.Context, serials []string) (map[strin
 	}
 	return out.Devices, c.do(ctx, http.MethodPost, "/devices", map[string]any{"devices": serials}, &out)
 }
+
+// AssignServiceDiscovery registers the account-driven enrollment service
+// discovery URL with Apple Business Manager. Devices (iOS 18.2+) whose
+// organization domain doesn't host the well-known file are redirected there.
+func (c *Client) AssignServiceDiscovery(ctx context.Context, discoveryURL string) error {
+	return c.do(ctx, http.MethodPost, "/account-driven-enrollment/profile", map[string]string{"mdm_service_discovery_url": discoveryURL}, nil)
+}

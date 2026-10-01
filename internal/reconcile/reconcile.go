@@ -2,14 +2,18 @@ package reconcile
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/yeungalan/orchard-mdm/internal/ddm"
 	"github.com/yeungalan/orchard-mdm/internal/events"
 	"github.com/yeungalan/orchard-mdm/internal/mdm"
+	"github.com/yeungalan/orchard-mdm/internal/profiles"
 	"github.com/yeungalan/orchard-mdm/internal/store"
 	"github.com/yeungalan/orchard-mdm/internal/vpp"
 )
@@ -289,12 +293,19 @@ func (r *Reconciler) reconcileProfiles(d *store.Device, want *desired) int {
 		ref := fmt.Sprintf("profile:%d", pid)
 		if st != nil && st.Version == p.Version {
 			switch st.Status {
-			case "installed", "failed":
+			case "installed", "failed", "skipped":
 				continue
 			case "pending":
 				if r.store.HasPendingCommand(d.UDID, "InstallProfile", ref) {
 					continue
 				}
+			}
+		}
+		if d.UserEnrollment {
+			if bad := profiles.UnsupportedOnUserEnrollment(p.PayloadTypes); len(bad) > 0 {
+				_ = r.store.SetProfileState(&store.ProfileState{DeviceID: d.UDID, ProfileID: pid, Identifier: p.Identifier, Version: p.Version, Status: "skipped",
+					Error: "Personal devices enrolled with User Enrollment don't accept " + strings.Join(bad, ", ")})
+				continue
 			}
 		}
 		payload, err := r.mdm.ProfileForDevice(p, d)
@@ -311,6 +322,10 @@ func (r *Reconciler) reconcileProfiles(d *store.Device, want *desired) int {
 	}
 	for pid, st := range byID {
 		if want.profiles[pid] {
+			continue
+		}
+		if st.Status == "skipped" {
+			_ = r.store.DeleteProfileState(d.UDID, pid)
 			continue
 		}
 		if st.Status == "failed" && st.Version > 0 && st.CommandUUID != "" {
@@ -464,9 +479,21 @@ func (r *Reconciler) reconcileDeclarations(d *store.Device) int {
 	return 1
 }
 
-// ensureLicense associates an Apps and Books license with the device.
+// VPPClientUserID is the Apps and Books user identifier Orchard registers
+// for a Managed Apple Account (user-based licensing for personal devices).
+func VPPClientUserID(managedAppleID string) string {
+	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(managedAppleID))))
+	return "orchard-" + hex.EncodeToString(sum[:12])
+}
+
+// ensureLicense associates an Apps and Books license with the device, or
+// with the person's Managed Apple Account on User Enrollment devices.
 func (r *Reconciler) ensureLicense(app *store.App, d *store.Device) error {
-	if d.SerialNumber == "" {
+	userBased := d.UserEnrollment || (d.SerialNumber == "" && d.ManagedAppleID != "")
+	if userBased && d.ManagedAppleID == "" {
+		return fmt.Errorf("personal device has no Managed Apple Account")
+	}
+	if !userBased && d.SerialNumber == "" {
 		return fmt.Errorf("device serial number unknown")
 	}
 	adam := fmt.Sprint(app.ITunesID)
@@ -482,7 +509,15 @@ func (r *Reconciler) ensureLicense(app *store.App, d *store.Device) error {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			_, err := vpp.New(r.vppURL, t.Token).Associate(ctx, adam, a.PricingParam, []string{d.SerialNumber})
+			c := vpp.New(r.vppURL, t.Token)
+			var err error
+			if userBased {
+				uid := VPPClientUserID(d.ManagedAppleID)
+				_, _ = c.CreateUsers(ctx, []vpp.User{{ClientUserID: uid, Email: d.ManagedAppleID, ManagedAppleID: d.ManagedAppleID}})
+				_, err = c.AssociateUsers(ctx, adam, a.PricingParam, []string{uid})
+			} else {
+				_, err = c.Associate(ctx, adam, a.PricingParam, []string{d.SerialNumber})
+			}
 			cancel()
 			if err == nil {
 				return nil

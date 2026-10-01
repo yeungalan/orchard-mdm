@@ -1,7 +1,8 @@
 // Command orchard-sim enrolls simulated iOS devices against an Orchard MDM
 // server for demos, load tests and UI development. It needs an enrollment
-// link (or token) and a server whose APNs certificate is configured; since
-// simulated devices cannot receive pushes, they poll instead.
+// link (or, with -account, a server with work account sign-in enabled) and a
+// server whose APNs certificate is configured; since simulated devices cannot
+// receive pushes, they poll instead.
 package main
 
 import (
@@ -25,9 +26,15 @@ func main() {
 	interval := flag.Duration("poll", 30*time.Second, "how often each device polls for commands")
 	insecure := flag.Bool("insecure", false, "skip TLS verification (self-signed test servers)")
 	once := flag.Bool("once", false, "enroll, process queued commands once, and exit")
+	server := flag.String("server", "", "server base URL for -account enrollments, e.g. https://mdm.example.com")
+	account := flag.String("account", "", "enroll by work account sign-in (User Enrollment / BYOD) as this account; with -n > 1 a number is added")
+	code := flag.String("code", "", "enrollment code used to sign in with -account")
 	flag.Parse()
-	if *enrollURL == "" {
-		log.Fatal("-enroll is required")
+	if *enrollURL == "" && *account == "" {
+		log.Fatal("-enroll or -account is required")
+	}
+	if *account != "" && (*server == "" || *code == "") {
+		log.Fatal("-account needs -server and -code")
 	}
 	client := &http.Client{Timeout: 30 * time.Second}
 	if *insecure {
@@ -40,7 +47,37 @@ func main() {
 	products := []string{"iPhone17,1", "iPhone16,2", "iPhone15,3", "iPad14,1", "iPad16,3", "iPhone17,3"}
 	names := []string{"Front desk", "Warehouse", "Sales", "Field tech", "Kiosk", "Reception", "Driver", "Clinic", "Lab", "Store"}
 	var wg sync.WaitGroup
-	for i := 0; i < *count; i++ {
+	poll := func(d *devicesim.Device) {
+		defer wg.Done()
+		for {
+			handled, err := d.Poll()
+			if err != nil {
+				log.Printf("%s: %v", d.Name, err)
+			} else if len(handled) > 0 {
+				log.Printf("%s handled %v", d.Name, handled)
+			}
+			if *once || !d.Enrolled() {
+				return
+			}
+			time.Sleep(*interval + time.Duration(rand.Intn(5000))*time.Millisecond)
+		}
+	}
+	for i := 0; i < *count && *account != ""; i++ {
+		user, domain, _ := strings.Cut(*account, "@")
+		id := *account
+		if *count > 1 {
+			id = fmt.Sprintf("%s%d@%s", user, i+1, domain)
+		}
+		dev := devicesim.New(fmt.Sprintf("%s's %s", strings.ToUpper(user[:1])+user[1:], []string{"iPhone", "iPad"}[i%2]), []string{"iPhone16,2", "iPad14,1"}[i%2])
+		dev.HTTP = client
+		if err := dev.AccountEnroll(*server, id, devicesim.CodeAuth(*code)); err != nil {
+			log.Fatalf("account enroll %s: %v", id, err)
+		}
+		log.Printf("enrolled %s with User Enrollment (enrollment ID %s)", id, dev.UDID)
+		wg.Add(1)
+		go poll(dev)
+	}
+	for i := 0; i < *count && *account == ""; i++ {
 		resp, err := client.Get(profileURL)
 		if err != nil {
 			log.Fatal(err)
@@ -63,21 +100,7 @@ func main() {
 		}
 		log.Printf("enrolled %s (%s, serial %s)", dev.Name, dev.UDID, dev.Serial)
 		wg.Add(1)
-		go func(d *devicesim.Device) {
-			defer wg.Done()
-			for {
-				handled, err := d.Poll()
-				if err != nil {
-					log.Printf("%s: %v", d.Name, err)
-				} else if len(handled) > 0 {
-					log.Printf("%s handled %v", d.Name, handled)
-				}
-				if *once || !d.Enrolled() {
-					return
-				}
-				time.Sleep(*interval + time.Duration(rand.Intn(5000))*time.Millisecond)
-			}
-		}(dev)
+		go poll(dev)
 	}
 	wg.Wait()
 }

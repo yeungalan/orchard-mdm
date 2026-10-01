@@ -108,6 +108,9 @@ func Supported(d *store.Device) bool {
 	}
 	major := 0
 	fmt.Sscanf(v, "%d", &major)
+	if d.UserEnrollment {
+		return major >= 15 // DDM shipped first for User Enrollment
+	}
 	return major >= 16
 }
 
