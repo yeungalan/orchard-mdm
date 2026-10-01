@@ -1,0 +1,49 @@
+{{template "head" .}}
+{{if not .Device}}
+  <h1>Company Portal</h1>
+  <p class="callout callout-bad">{{.Error}}</p>
+{{else}}
+  {{with .Device}}
+  <section class="device">
+    <h1>{{if .DeviceName}}{{.DeviceName}}{{else}}This device{{end}}</h1>
+    <p class="meta">{{model .ProductName}} running iOS {{.OSVersion}}</p>
+    <p class="meta">Serial number <span class="ident">{{.SerialNumber}}</span></p>
+    <p class="health health-{{.Compliance}}">
+      {{if eq .Compliance "compliant"}}Meets {{$.Org}} requirements
+      {{else if eq .Compliance "grace"}}Action needed soon
+      {{else if eq .Compliance "noncompliant"}}Doesn't meet {{$.Org}} requirements
+      {{else}}Checking requirements{{end}}
+    </p>
+    {{if $.Reasons}}<ul class="reasons">{{range $.Reasons}}<li>{{.}}</li>{{end}}</ul>{{end}}
+    <dl class="facts">
+      <div><dt>Battery</dt><dd>{{pct .BatteryLevel}}</dd></div>
+      <div><dt>Free storage</dt><dd>{{if .CapacityGB}}{{gb .AvailableGB}}{{else}}—{{end}}</dd></div>
+      <div><dt>Last check-in</dt><dd>{{ago .LastSeen}}</dd></div>
+    </dl>
+    <form method="post" action="/portal/{{$.Token}}/sync"><button class="button button-quiet" type="submit">Check in now</button></form>
+  </section>
+  {{end}}
+  {{if .Notice}}<p class="callout callout-good" role="status">{{.Notice}}</p>{{end}}
+  {{if .Error}}<p class="callout callout-bad" role="alert">{{.Error}}</p>{{end}}
+  <section>
+    <h2>Apps for work</h2>
+    {{if .Apps}}
+    <ul class="apps">
+      {{range .Apps}}
+      <li>
+        {{if .Icon}}<img src="{{.Icon}}" alt="" width="48" height="48" loading="lazy">{{else}}<span class="appicon" aria-hidden="true"></span>{{end}}
+        <div class="appname"><strong>{{.Name}}</strong>{{if .Seller}}<span>{{.Seller}}</span>{{end}}</div>
+        {{if eq .Status "installed"}}<span class="state">Installed</span>
+        {{else if eq .Status "installing"}}<span class="state">Installing…</span>
+        {{else if .Required}}<span class="state">Installs automatically</span>
+        {{else}}<form method="post" action="/portal/{{$.Token}}/apps/{{.ID}}"><button class="button button-small" type="submit">{{if eq .Status "failed"}}Try again{{else}}Install{{end}}</button></form>{{end}}
+      </li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="meta">No optional apps are offered to this device yet.</p>
+    {{end}}
+  </section>
+{{end}}
+{{template "support" .}}
+{{template "foot" .}}

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Check formatting
+        run: test -z "$(gofmt -l ./cmd ./internal ./web)"
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test -count=1 ./...
+      - name: Build
+        run: CGO_ENABLED=0 go build ./cmd/orchard ./cmd/orchard-sim
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check console modules
+        run: |
+          for f in web/static/js/*.js web/static/js/pages/*.js; do
+            cp "$f" /tmp/m.mjs && node --check /tmp/m.mjs || exit 1
+          done
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t orchard-mdm:ci .

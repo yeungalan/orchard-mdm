@@ -1,0 +1,8 @@
+/data/
+/orchard
+/orchard-sim
+/dist/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store

@@ -1,0 +1,29 @@
+{{define "head"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>{{.Title}} – {{.Org}}</title>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/portal.css">
+</head>
+<body>
+<header class="masthead">
+  <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><use href="/static/icon.svg#mark"/></svg>
+  <span class="org">{{.Org}}</span>
+</header>
+<main class="sheet">{{end}}
+
+{{define "support"}}{{if or .Support.email .Support.phone .Support.url}}
+<section class="support">
+  <h2>Need help?</h2>
+  <p>Contact {{.Org}} IT{{if .Support.phone}} at <a href="tel:{{.Support.phone}}">{{.Support.phone}}</a>{{end}}{{if .Support.email}}{{if .Support.phone}} or{{end}} <a href="mailto:{{.Support.email}}">{{.Support.email}}</a>{{end}}.{{if .Support.url}} <a href="{{.Support.url}}">Help center</a>{{end}}</p>
+</section>{{end}}{{end}}
+
+{{define "foot"}}</main>
+<footer class="foot">Managed by {{.Org}} with Orchard MDM</footer>
+</body>
+</html>{{end}}

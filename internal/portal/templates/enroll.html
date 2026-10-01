@@ -1,0 +1,42 @@
+{{template "head" .}}
+{{if .Error}}
+  <h1>Enrollment</h1>
+  <p class="callout callout-bad">{{.Error}}</p>
+  {{if and .Ready .RequireToken}}{{template "codeform" .}}{{end}}
+{{else if .ProfileURL}}
+  <h1>Set up {{.Org}} on this {{if .IsAppleMob}}device{{else}}iPhone or iPad{{end}}</h1>
+  <p class="lede">Enrolling lets {{.Org}} configure Wi-Fi, email and apps for work, and keep the device secure. {{.Org}} can see the device model, installed apps and settings — not your messages, photos or browsing history.</p>
+  {{if .TokenName}}<p class="meta">Enrollment link: {{.TokenName}}</p>{{end}}
+  {{if .IsAppleMob}}
+    <a class="button" href="{{.ProfileURL}}">Download profile</a>
+    <ol class="steps">
+      <li><strong>Download the profile.</strong> Tap <em>Allow</em> when Safari asks.</li>
+      <li><strong>Open Settings.</strong> Tap <em>Profile Downloaded</em> near the top (or General → VPN &amp; Device Management).</li>
+      <li><strong>Install it.</strong> Tap <em>Install</em>, enter your passcode and confirm Remote Management.</li>
+      <li><strong>You're done.</strong> Apps and settings arrive over the next few minutes. A Company Portal icon appears on your Home Screen.</li>
+    </ol>
+  {{else}}
+    <div class="handoff">
+      {{if .QRURL}}<img class="qr" src="{{.QRURL}}" width="200" height="200" alt="QR code for the enrollment link">{{end}}
+      <div>
+        <p>Open this page on the iPhone or iPad you want to enroll{{if .QRURL}} — scan the code with the Camera app{{end}}.</p>
+        {{if .EnrollURL}}<p class="link"><code>{{.EnrollURL}}</code></p>{{end}}
+        <p class="meta">Profiles must be installed on the device itself. <a href="{{.ProfileURL}}">Download the profile anyway</a> (for Apple Configurator).</p>
+      </div>
+    </div>
+  {{end}}
+{{else}}
+  <h1>Enroll your device</h1>
+  <p class="lede">Enter the enrollment code from {{.Org}} IT to set up this iPhone or iPad for work.</p>
+  {{template "codeform" .}}
+{{end}}
+{{template "support" .}}
+{{template "foot" .}}
+
+{{define "codeform"}}
+<form class="codeform" method="post" action="/enroll">
+  <label for="code">Enrollment code</label>
+  <input id="code" name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" required>
+  <button class="button" type="submit">Continue</button>
+</form>
+{{end}}

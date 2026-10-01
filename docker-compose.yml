@@ -1,0 +1,22 @@
+services:
+  orchard:
+    build: .
+    image: orchard-mdm:latest
+    restart: unless-stopped
+    ports:
+      - "443:8443"   # HTTPS (Let's Encrypt)
+      - "80:8080"    # HTTP redirect and ACME challenges
+    volumes:
+      - orchard-data:/data
+    environment:
+      ORCHARD_URL: https://mdm.example.com
+      ORCHARD_ACME_DOMAINS: mdm.example.com
+      ORCHARD_ACME_EMAIL: it@example.com
+      ORCHARD_LISTEN: ":8443"
+      ORCHARD_HTTP_REDIRECT: ":8080"
+      # Behind your own reverse proxy instead? Remove the ACME settings and use:
+      # ORCHARD_LISTEN: ":8080"
+      # ORCHARD_TRUST_PROXY: "true"
+
+volumes:
+  orchard-data:
