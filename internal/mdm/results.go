@@ -65,13 +65,14 @@ func (s *Service) handleResult(d *store.Device, cmd *store.Command, msg map[stri
 	case "DeviceConfigured":
 		_ = s.store.UpdateDevice(d.UDID, map[string]any{"awaiting_configuration": false})
 		s.event(d.UDID, "device.configured", "info", "Released from Setup Assistant", nil)
-	case "Settings", "ClearPasscode", "InstallProfile", "RemoveProfile", "RemoveApplication":
+	case "Settings", "ClearPasscode", "InstallProfile", "RemoveProfile", "RemoveApplication", "InstallApplication":
 		follow := map[string][]string{
-			"Settings":          {"DeviceInformation"},
-			"ClearPasscode":     {"SecurityInfo"},
-			"InstallProfile":    {"ProfileList"},
-			"RemoveProfile":     {"ProfileList"},
-			"RemoveApplication": {"InstalledApplicationList", "ManagedApplicationList"},
+			"InstallApplication": {"ManagedApplicationList", "InstalledApplicationList"},
+			"Settings":           {"DeviceInformation"},
+			"ClearPasscode":      {"SecurityInfo"},
+			"InstallProfile":     {"ProfileList"},
+			"RemoveProfile":      {"ProfileList"},
+			"RemoveApplication":  {"InstalledApplicationList", "ManagedApplicationList"},
 		}[cmd.RequestType]
 		for _, t := range follow {
 			if !s.store.HasPendingCommand(d.UDID, t, "") {

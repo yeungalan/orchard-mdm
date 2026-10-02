@@ -43,15 +43,21 @@ func sendFile(w http.ResponseWriter, name, ctype string, data []byte) error {
 func (a *API) readiness() []map[string]any {
 	base := a.MDM.PublicURL()
 	push := a.APNs.CertInfo()
-	_, _, chain := a.MDM.SigningIdentity()
 	signer, _, _ := a.MDM.SigningIdentity()
-	_ = chain
+	signDetail := ""
+	if signer != nil {
+		name := signer.Subject.CommonName
+		if name == "" && len(signer.DNSNames) > 0 {
+			name = signer.DNSNames[0]
+		}
+		signDetail = "Signed as " + name + ", valid until " + signer.NotAfter.Format("Jan 2, 2006")
+	}
 	checks := []map[string]any{
 		{"id": "url", "label": "Public HTTPS URL configured", "ok": strings.HasPrefix(base, "https://"), "detail": base,
 			"help": "Devices must reach the server over HTTPS with a trusted certificate. Set -url or Settings → General."},
 		{"id": "apns", "label": "APNs push certificate installed", "ok": push.Configured && push.Error == "" && push.DaysLeft > 0,
 			"detail": push.Topic, "help": "Settings → Apple Push: create a CSR, get it signed, and upload Apple's certificate."},
-		{"id": "signing", "label": "Profiles signed with the TLS certificate", "ok": signer != nil,
+		{"id": "signing", "label": "Profiles signed with the TLS certificate", "ok": signer != nil, "detail": signDetail,
 			"help": "Optional. When Orchard terminates TLS itself, profiles are signed and shown as Verified."},
 	}
 	if push.Configured && push.DaysLeft <= 30 {
@@ -654,7 +660,7 @@ var publicSettings = []string{
 	mdm.SettingInventoryHours, mdm.SettingTelemetryMinutes, mdm.SettingLostModeLocMinutes, mdm.SettingSignProfiles, mdm.SettingSCEPValidityDays,
 	mdm.SettingCommandRetention, mdm.SettingTelemetryRetention, mdm.SettingPortalEnabled, mdm.SettingADESyncMinutes, mdm.SettingExtraTrustCerts,
 	mdm.SettingEnrollConsentText, mdm.SettingCommandExpiryDays, mdm.SettingRecordConnectionIPs, "compliance_default", "ade_allow_unknown_serials",
-	"portal_agent_report_seconds",
+	mdm.SettingAgentReportSeconds,
 }
 
 func (a *API) getSettings(w http.ResponseWriter, r *http.Request, p *Principal) error {
@@ -687,7 +693,7 @@ func (a *API) putSettings(w http.ResponseWriter, r *http.Request, p *Principal) 
 				return badRequest("the public URL must start with https://")
 			}
 		case mdm.SettingInventoryHours, mdm.SettingTelemetryMinutes, mdm.SettingLostModeLocMinutes, mdm.SettingSCEPValidityDays,
-			mdm.SettingCommandRetention, mdm.SettingTelemetryRetention, mdm.SettingADESyncMinutes, mdm.SettingCommandExpiryDays, "portal_agent_report_seconds":
+			mdm.SettingCommandRetention, mdm.SettingTelemetryRetention, mdm.SettingADESyncMinutes, mdm.SettingCommandExpiryDays, mdm.SettingAgentReportSeconds:
 			if n, err := strconv.Atoi(v); err != nil || n < 0 {
 				return badRequest("%s must be a non-negative number", k)
 			}
@@ -820,8 +826,24 @@ func (a *API) listIssuedCerts(w http.ResponseWriter, r *http.Request, p *Princip
 	if err != nil {
 		return err
 	}
+	type certView struct {
+		*store.IssuedCert
+		DeviceName string `json:"device_name,omitempty"`
+	}
+	names := map[string]string{}
+	out := make([]certView, len(certs))
+	for i, c := range certs {
+		if _, seen := names[c.DeviceID]; !seen && c.DeviceID != "" {
+			if d, err := a.Store.GetDevice(c.DeviceID); err == nil {
+				names[c.DeviceID] = d.DeviceName
+			} else {
+				names[c.DeviceID] = ""
+			}
+		}
+		out[i] = certView{IssuedCert: c, DeviceName: names[c.DeviceID]}
+	}
 	ca, _ := a.MDM.CA()
-	return ok(w, map[string]any{"items": certs, "ca": map[string]any{"subject": ca.Subject.String(), "not_after": ca.NotAfter, "fingerprint": pki.Fingerprint(ca)}})
+	return ok(w, map[string]any{"items": out, "ca": map[string]any{"subject": ca.Subject.String(), "not_after": ca.NotAfter, "fingerprint": pki.Fingerprint(ca)}})
 }
 
 // ---- events / audit / system ----
@@ -834,12 +856,65 @@ func (a *API) listEvents(w http.ResponseWriter, r *http.Request, p *Principal) e
 	return ok(w, map[string]any{"items": evs})
 }
 
+// auditView adds a readable name and console link for the entry's target.
+type auditView struct {
+	*store.AuditEntry
+	TargetLabel string `json:"target_label,omitempty"`
+	TargetHref  string `json:"target_href,omitempty"`
+}
+
 func (a *API) listAudit(w http.ResponseWriter, r *http.Request, p *Principal) error {
 	items, total, err := a.Store.ListAudit(r.URL.Query().Get("q"), queryInt(r, "limit", 100), queryInt(r, "offset", 0))
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"items": items, "total": total})
+	type ref struct{ label, href string }
+	cache := map[string]ref{}
+	resolve := func(e *store.AuditEntry) ref {
+		key := e.Target
+		if strings.HasPrefix(e.Action, "device.") {
+			key = "device:" + e.Target
+		}
+		if v, hit := cache[key]; hit {
+			return v
+		}
+		var v ref
+		kind, idStr, _ := strings.Cut(key, ":")
+		id, _ := strconv.ParseInt(idStr, 10, 64)
+		switch kind {
+		case "device":
+			if d, err := a.Store.GetDevice(idStr); err == nil {
+				v = ref{d.DeviceName, "#/devices/" + idStr}
+				if v.label == "" {
+					v.label = d.SerialNumber
+				}
+			}
+		case "profile":
+			if x, err := a.Store.GetProfile(id); err == nil {
+				v = ref{x.Name, "#/profiles/" + idStr}
+			}
+		case "app":
+			if x, err := a.Store.GetApp(id); err == nil {
+				v = ref{x.Name, "#/apps/" + idStr}
+			}
+		case "declaration":
+			if x, err := a.Store.GetDeclaration(id); err == nil {
+				v = ref{x.Name, "#/declarations/" + idStr}
+			}
+		case "compliance":
+			if x, err := a.Store.GetCompliancePolicy(id); err == nil {
+				v = ref{x.Name, "#/compliance/" + idStr}
+			}
+		}
+		cache[key] = v
+		return v
+	}
+	out := make([]auditView, len(items))
+	for i, e := range items {
+		v := resolve(e)
+		out[i] = auditView{AuditEntry: e, TargetLabel: v.label, TargetHref: v.href}
+	}
+	return ok(w, map[string]any{"items": out, "total": total})
 }
 
 func (a *API) variables(w http.ResponseWriter, r *http.Request, p *Principal) error {

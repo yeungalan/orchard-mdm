@@ -1,5 +1,5 @@
 import { html, $, $$, api, can, session, ago, bytes, stateChip, modal, toast, toastError, confirmDialog, plural, emptyState, debounce, copyText } from "../lib.js";
-import { assignmentsPanel, pickDevices } from "../components.js";
+import { assignmentsPanel, pickDevices, intentLabel } from "../components.js";
 
 const KIND = { appstore: "App Store", vpp: "App Store (licensed)", enterprise: "In-house" };
 
@@ -12,10 +12,10 @@ export async function render(ctx) {
     <section class="panel">${res.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>App</th><th>Source</th><th class="num">On devices</th><th class="num">Assignments</th><th>Deployment</th></tr></thead><tbody>
       ${res.items.map((a) => html`<tr><td><div class="app-cell">${a.icon_url ? html`<img class="app-icon" src="${a.icon_url}" alt="" loading="lazy">` : html`<span class="app-icon"></span>`}<div><a class="primary" href="#/apps/${a.id}">${a.name}</a><span class="cell-sub ident" style="margin-left:0">${a.bundle_id}</span></div></div></td>
         <td>${KIND[a.kind]}${a.use_vpp ? html`<span class="cell-sub">uses Apps and Books licenses</span>` : ""}</td><td class="num">${a.installed}</td><td class="num">${a.assignments}</td>
-        <td>${deployment(a.states)}</td></tr>`)}
+        <td>${deployment(a.states, a.available)}</td></tr>`)}
     </tbody></table></div>` : emptyState("No apps yet", "Add an App Store app, upload an in-house .ipa, or connect Apps and Books to use purchased licenses.")}</section>
     ${vpp.items.length ? html`<h2 class="section">Apps and Books licenses</h2><section class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>App</th><th class="num">Assigned</th><th class="num">Available</th><th class="num">Total</th><th></th></tr></thead><tbody>
-      ${vpp.items.map((v) => html`<tr><td><div class="app-cell">${v.icon_url ? html`<img class="app-icon" src="${v.icon_url}" alt="" loading="lazy">` : html`<span class="app-icon"></span>`}<div><strong>${v.name || "App " + v.adam_id}</strong><span class="cell-sub">${v.product_type} ${v.adam_id}</span></div></div></td>
+      ${vpp.items.map((v) => html`<tr><td><div class="app-cell">${v.icon_url ? html`<img class="app-icon" src="${v.icon_url}" alt="" loading="lazy">` : html`<span class="app-icon"></span>`}<div><strong>${v.name || "App " + v.adam_id}</strong><span class="cell-sub">${v.product_type === "Book" ? "Book" : "App Store"} ID ${v.adam_id}</span></div></div></td>
         <td class="num">${v.assigned_count}</td><td class="num">${v.available_count}</td><td class="num">${v.total_count}</td>
         <td class="right">${can("manage") && !res.items.some((a) => String(a.itunes_id) === v.adam_id) ? html`<button class="btn btn-sm" data-add-vpp="${v.adam_id}">Add to catalog</button>` : ""}</td></tr>`)}
     </tbody></table></div></section>` : ""}`.s;
@@ -26,14 +26,15 @@ export async function render(ctx) {
   }));
 }
 
-function deployment(st) {
+function deployment(st, available) {
   const parts = [];
   if (st.installed) parts.push(html`<span class="chip chip-good">${st.installed} installed</span>`);
   const busy = (st.pending || 0) + (st.installing || 0) + (st.removing || 0);
   if (busy) parts.push(html`<span class="chip chip-info">${busy} in progress</span>`);
   const bad = (st.failed || 0) + (st.missing || 0);
   if (bad) parts.push(html`<span class="chip chip-bad">${bad} failed</span>`);
-  return parts.length ? html`<span class="row" style="gap:6px">${parts}</span>` : html`<span class="muted">Not deployed</span>`;
+  if (!parts.length) return html`<span class="muted">${available ? "Offered in Company Portal" : "Not deployed"}</span>`;
+  return html`<span class="row" style="gap:6px">${parts}</span>`;
 }
 
 function storeDialog(onAdded) {
@@ -41,7 +42,7 @@ function storeDialog(onAdded) {
     body: html`<div class="row"><input type="search" id="term" placeholder="App name, App Store link, ID or bundle ID" style="flex:1" autofocus>
       <select id="country" style="width:auto" aria-label="Store country">${["us", "gb", "jp", "hk", "tw", "cn", "au", "ca", "de", "fr", "sg", "kr"].map((c) => html`<option value="${c}">${c.toUpperCase()}</option>`)}</select></div>
       <label class="check"><input type="checkbox" id="vpp"><span>Use Apps and Books licenses<small>Installs without an Apple Account on the device. Requires licenses for this app.</small></span></label>
-      <div id="results" style="margin-top:12px"></div>`, actions: [{ id: "c", label: "Close" }] });
+      <div id="results" style="margin-top:12px"></div>` });
   const el = ctl.el;
   const search = debounce(async () => {
     const term = $("#term", el).value.trim();
@@ -100,7 +101,7 @@ async function detail({ root, params, navigate, refresh }) {
     <div class="page-head"><div class="app-cell" style="align-items:flex-start;gap:14px">${a.icon_url ? html`<img class="app-icon" style="width:56px;height:56px;border-radius:13px" src="${a.icon_url}" alt="">` : ""}
       <div><h1>${a.name}</h1><p class="sub">${KIND[a.kind]}${a.seller ? `, ${a.seller}` : ""}${a.version ? `, version ${a.version}` : ""}</p><p class="sub ident">${a.bundle_id}</p></div></div>
       <div class="actions">${can("act") ? html`<button class="btn" id="install">Install on devices</button>` : ""}${editable ? html`<button class="btn btn-danger" id="del">Delete</button>` : ""}</div></div>
-    <div class="grid-2">
+    <div class="grid-2 top">
       <section class="panel"><div class="panel-head"><h2>Settings</h2></div><form class="panel-pad" id="settings">
         <label class="check"><input type="checkbox" name="remove_on_unenroll" ${a.remove_on_unenroll ? "checked" : ""} ${editable ? "" : "disabled"}><span>Remove the app when the device leaves management</span></label>
         <label class="check"><input type="checkbox" name="prevent_backup" ${a.prevent_backup ? "checked" : ""} ${editable ? "" : "disabled"}><span>Prevent backup of app data</span></label>
@@ -153,7 +154,7 @@ async function detail({ root, params, navigate, refresh }) {
     const failed = st.items.filter((s) => s.status === "failed" || s.status === "missing").length;
     $("#status", root).innerHTML = html`<div class="panel-head"><h2>Deployment</h2>${failed && can("manage") ? html`<button class="btn btn-sm" id="retry">Retry ${failed} failed</button>` : ""}</div>
       ${st.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Device</th><th>Intent</th><th>State</th><th class="num">Attempts</th><th>Updated</th></tr></thead><tbody>
-      ${st.items.map((s) => html`<tr><td><a href="#/devices/${encodeURIComponent(s.device_id)}">${s.device_name || s.device_id}</a></td><td>${s.intent}</td><td>${stateChip(s.status)}${s.error ? html`<span class="cell-sub">${s.error}</span>` : ""}</td><td class="num">${s.attempts}</td><td>${ago(s.updated_at)}</td></tr>`)}
+      ${st.items.map((s) => html`<tr><td><a href="#/devices/${encodeURIComponent(s.device_id)}">${s.device_name || s.device_id}</a></td><td>${intentLabel(s.intent, "app")}</td><td>${stateChip(s.status)}${s.error ? html`<span class="cell-sub">${s.error}</span>` : ""}</td><td class="num">${s.attempts}</td><td>${ago(s.updated_at)}</td></tr>`)}
       </tbody></table></div>` : html`<p class="hint panel-pad" style="margin:0">Not deployed to any device yet.</p>`}`.s;
     $("#retry", root)?.addEventListener("click", async () => {
       try { await api.post(`/api/apps/${params.id}/retry`); toast("Failed installs will be retried"); setTimeout(loadStatus, 2500); } catch (e) { toastError(e); }

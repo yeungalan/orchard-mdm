@@ -1,4 +1,4 @@
-import { html, $, api, can, ago, deviceName, complianceChip, toast, toastError, confirmDialog, emptyState } from "../lib.js";
+import { html, $, api, can, ago, deviceName, complianceChip, toast, toastError, confirmDialog, emptyState, plural } from "../lib.js";
 import { assignmentsPanel } from "../components.js";
 import { statusStack } from "../charts.js";
 
@@ -12,7 +12,7 @@ export async function render(ctx) {
       <section class="panel"><div class="panel-head"><h2>Fleet status</h2></div><div class="panel-pad">${statusStack(sum.counts)}</div></section>
       <section class="panel"><div class="panel-head"><h2>Policies</h2></div>
         ${pol.items.length ? html`<div class="table-wrap"><table class="table"><tbody>${pol.items.map((p) => html`<tr><td><a class="primary" href="#/compliance/${p.id}">${p.name}</a>${p.description ? html`<span class="cell-sub">${p.description}</span>` : ""}</td>
-          <td>${p.enabled ? html`<span class="chip chip-good">On</span>` : html`<span class="chip chip-unknown">Off</span>`}</td><td class="num">${p.assignments} groups</td></tr>`)}</tbody></table></div>`
+          <td>${p.enabled ? html`<span class="chip chip-good">On</span>` : html`<span class="chip chip-unknown">Off</span>`}</td><td class="num">${plural(p.assignments, "group")}</td></tr>`)}</tbody></table></div>`
           : html`<p class="hint panel-pad" style="margin:0">No policies yet. Without a policy every device counts as compliant.</p>`}</section>
     </div>
     <h2 class="section">Devices that need attention</h2>
@@ -35,7 +35,7 @@ async function editor({ root, params, navigate, refresh }) {
   root.innerHTML = html`<div class="crumb"><a href="#/compliance">Compliance</a></div>
     <div class="page-head"><div><h1>${isNew ? "New compliance policy" : p.name}</h1></div>
       ${!isNew && editable ? html`<div class="actions"><button class="btn btn-danger" id="del">Delete</button></div>` : ""}</div>
-    <div class="grid-2"><form class="panel panel-pad" id="f">
+    <div class="grid-2 top"><form class="panel panel-pad" id="f">
       <label class="field"><span>Name</span><input type="text" name="name" value="${p.name}" required ${dis}></label>
       <label class="field"><span>Description</span><input type="text" name="description" value="${p.description}" ${dis}></label>
       <label class="check"><input type="checkbox" name="enabled" ${p.enabled ? "checked" : ""} ${dis}><span>Policy is on</span></label>

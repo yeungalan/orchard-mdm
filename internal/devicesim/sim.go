@@ -70,6 +70,10 @@ type Device struct {
 	UserEnrollment bool
 	EnrollmentMode string
 	ManagedAppleID string
+
+	// StoreApps maps App Store IDs to the apps installed for them (name and
+	// bundle ID); unknown IDs install as "store.app.<id>".
+	StoreApps map[string]App
 }
 
 func (d *Device) idKey() string {
@@ -265,8 +269,13 @@ func (d *Device) scepEnroll(sp map[string]any) error {
 	if err != nil {
 		return err
 	}
+	cn := "Orchard Sim " + d.Serial
+	if d.UserEnrollment {
+		// personal devices don't reveal their serial number
+		cn = "Orchard Sim " + d.Name
+	}
 	csrDER, err := x509util.CreateCertificateRequest(rand.Reader, &x509util.CertificateRequest{
-		CertificateRequest: x509.CertificateRequest{Subject: pkix.Name{CommonName: "Orchard Sim " + d.Serial}},
+		CertificateRequest: x509.CertificateRequest{Subject: pkix.Name{CommonName: cn}},
 		ChallengePassword:  challenge,
 	}, key)
 	if err != nil {
@@ -505,9 +514,12 @@ func (d *Device) handle(rt string, c map[string]any) map[string]any {
 		}
 		return ack(nil)
 	case "InstallApplication":
-		id := ""
+		id, name := "", ""
 		if v, ok := c["iTunesStoreID"]; ok {
 			id = fmt.Sprintf("store.app.%v", v)
+			if a, ok := d.StoreApps[fmt.Sprint(v)]; ok {
+				id, name = a.Identifier, a.Name
+			}
 		}
 		if u, ok := c["ManifestURL"].(string); ok {
 			id = "enterprise." + u[strings.LastIndex(u[:strings.LastIndex(u, "/")], "/")+1:strings.LastIndex(u, "/")]
@@ -515,7 +527,10 @@ func (d *Device) handle(rt string, c map[string]any) map[string]any {
 		if bid, ok := c["Identifier"].(string); ok {
 			id = bid
 		}
-		d.apps[id] = &App{Identifier: id, Name: id, Version: "1.0", Managed: true}
+		if name == "" {
+			name = id
+		}
+		d.apps[id] = &App{Identifier: id, Name: name, Version: "1.0", Managed: true}
 		return ack(map[string]any{"Identifier": id, "State": "Managed"})
 	case "RemoveApplication":
 		id, _ := c["Identifier"].(string)
@@ -596,6 +611,7 @@ func (d *Device) syncDeclarations() error {
 		return err
 	}
 	kinds := map[string]string{"Activations": "activation", "Configurations": "configuration", "Assets": "asset", "Management": "management"}
+	var activations []any
 	var statuses []any
 	var fetched []string
 	for group, list := range items.Declarations {
@@ -605,8 +621,12 @@ func (d *Device) syncDeclarations() error {
 				return err
 			}
 			fetched = append(fetched, path)
-			if kinds[group] == "configuration" {
-				statuses = append(statuses, map[string]any{"identifier": it.Identifier, "active": true, "valid": "valid", "server-token": it.ServerToken})
+			st := map[string]any{"identifier": it.Identifier, "active": true, "valid": "valid", "server-token": it.ServerToken}
+			switch kinds[group] {
+			case "configuration":
+				statuses = append(statuses, st)
+			case "activation":
+				activations = append(activations, st)
 			}
 		}
 	}
@@ -617,7 +637,7 @@ func (d *Device) syncDeclarations() error {
 				"power":            map[string]any{"battery-health": "normal"},
 			},
 			"passcode":   map[string]any{"is-present": d.PasscodePresent, "is-compliant": d.PasscodePresent},
-			"management": map[string]any{"declarations": map[string]any{"configurations": statuses}},
+			"management": map[string]any{"declarations": map[string]any{"configurations": statuses, "activations": activations}},
 		},
 		"Errors": []any{}, "FullReport": true,
 	})
@@ -629,4 +649,11 @@ func (d *Device) syncDeclarations() error {
 	d.ddmFetched = fetched
 	d.mu.Unlock()
 	return nil
+}
+
+// AddApp puts an app on the device, as if the user (or MDM, when managed) installed it.
+func (d *Device) AddApp(bundleID, name, version string, managed bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.apps[bundleID] = &App{Identifier: bundleID, Name: name, Version: version, Managed: managed}
 }

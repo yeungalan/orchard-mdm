@@ -435,7 +435,7 @@ func parseTS(v any) int64 {
 }
 
 func (p *portal) reportInterval() int {
-	n, _ := strconv.Atoi(p.MDM.Setting("portal_agent_report_seconds"))
+	n, _ := strconv.Atoi(p.MDM.Setting(mdm.SettingAgentReportSeconds))
 	if n <= 0 {
 		n = 900
 	}

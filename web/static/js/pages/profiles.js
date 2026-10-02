@@ -3,20 +3,32 @@ import { assignmentsPanel } from "../components.js";
 
 let schemaCache = null;
 async function schemas() {
-  if (!schemaCache) schemaCache = await api.get("/api/profile-schemas");
+  if (!schemaCache) {
+    schemaCache = await api.get("/api/profile-schemas");
+    typeNames = Object.fromEntries(schemaCache.items.map((s) => [s.type, s.name]));
+  }
   return schemaCache;
 }
 const short = (t) => t.replace("com.apple.", "");
+let typeNames = {};
+const typeName = (t) => typeNames[t] || short(t);
+// "Add an Identity certificate (.p12) or SCEP certificate payload to this profile first."
+function addFirstHint(types) {
+  const known = types.filter((t) => typeNames[t]);
+  const names = [...new Set((known.length ? known : types).map(typeName))];
+  const article = /^[aeiou]/i.test(names[0] || "") ? "an" : "a";
+  return `Add ${article} ${names.join(" or ")} payload to this profile first.`;
+}
 
 export async function render(ctx) {
   if (ctx.name === "profile") return editor(ctx);
   const { root, navigate } = ctx;
-  const res = await api.get("/api/profiles");
+  const [res] = await Promise.all([api.get("/api/profiles"), schemas()]);
   root.innerHTML = html`<div class="page-head"><div><h1>Configuration profiles</h1><p class="sub">Wi-Fi, VPN, email, restrictions, passcode rules and more. Build profiles here or upload ones made in Apple Configurator, then assign them to groups.</p></div>
     ${can("manage") ? html`<div class="actions"><button class="btn" id="upload">Upload .mobileconfig</button><a class="btn btn-primary" href="#/profiles/new">New profile</a></div>` : ""}</div>
     <section class="panel">${res.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Profile</th><th>Contents</th><th class="num">Assignments</th><th>Deployment</th><th>Updated</th></tr></thead><tbody>
       ${res.items.map((p) => html`<tr><td><a class="primary" href="#/profiles/${p.id}">${p.name}</a><span class="cell-sub ident" style="margin-left:0">${p.identifier}</span></td>
-        <td>${p.payload_types.slice(0, 4).map((t) => html`<span class="tag">${short(t)}</span>`)}${p.payload_types.length > 4 ? html`<span class="hint">+${p.payload_types.length - 4}</span>` : ""}</td>
+        <td>${p.payload_types.slice(0, 4).map((t) => html`<span class="tag">${typeName(t)}</span>`)}${p.payload_types.length > 4 ? html`<span class="hint">+${p.payload_types.length - 4}</span>` : ""}</td>
         <td class="num">${p.assignments}</td>
         <td>${deployment(p.states)}</td><td class="nowrap">${ago(p.updated_at)}<span class="cell-sub">version ${p.version}</span></td></tr>`)}
     </tbody></table></div>` : emptyState("No profiles yet", "Create your first profile, for example office Wi-Fi or a passcode policy.", can("manage") ? html`<a class="btn btn-primary" href="#/profiles/new">New profile</a>` : "")}</section>`.s;
@@ -105,9 +117,9 @@ function fieldControl(f, value, path, state) {
     case "payloadref": case "payloadrefs": {
       const opts = state.payloads.filter((p) => (f.ref_types || []).includes(p.type));
       const selected = Array.isArray(value) ? value : value ? [value] : [];
-      if (!opts.length) return html`<div class="field"><span class="field-label">${label}</span><span class="hint">Add a ${(f.ref_types || []).map(short).join(" or ")} payload to this profile first.</span></div>`;
-      if (f.type === "payloadrefs") return html`<div class="field"><span class="field-label">${label}</span>${opts.map((p) => html`<label class="check"><input type="checkbox" data-multi="${path}" value="${p.uuid}" ${selected.includes(p.uuid) ? "checked" : ""}><span>${p.display_name || short(p.type)}</span></label>`)}</div>`;
-      return html`<label class="field"><span>${label}</span><select ${raw(dk)}><option value="">None</option>${opts.map((p) => html`<option value="${p.uuid}" ${selected.includes(p.uuid) ? "selected" : ""}>${p.display_name || short(p.type)}</option>`)}</select>${help}</label>`;
+      if (!opts.length) return html`<div class="field"><span class="field-label">${label}</span><span class="hint">${addFirstHint(f.ref_types || [])}</span></div>`;
+      if (f.type === "payloadrefs") return html`<div class="field"><span class="field-label">${label}</span>${opts.map((p) => html`<label class="check"><input type="checkbox" data-multi="${path}" value="${p.uuid}" ${selected.includes(p.uuid) ? "checked" : ""}><span>${p.display_name || typeName(p.type)}</span></label>`)}</div>`;
+      return html`<label class="field"><span>${label}</span><select ${raw(dk)}><option value="">None</option>${opts.map((p) => html`<option value="${p.uuid}" ${selected.includes(p.uuid) ? "selected" : ""}>${p.display_name || typeName(p.type)}</option>`)}</select>${help}</label>`;
     }
     case "dictlist": {
       const rows = Array.isArray(value) ? value : [];
@@ -171,14 +183,14 @@ async function editor({ root, params, navigate, refresh }) {
       <div class="actions">${!isNew ? html`<button class="btn" id="dl">Download</button>` : ""}${!isNew && editable ? html`<button class="btn btn-danger" id="del">Delete</button>` : ""}
         ${editable ? html`<button class="btn btn-primary" id="save">${isNew ? "Save profile" : "Save and redeploy"}</button>` : ""}</div></div>
     <div class="stack">
-      <section class="panel panel-pad"><div class="inline-fields">
+      <section class="panel panel-pad"><div class="inline-fields wide">
         <label class="field"><span>Name</span><input type="text" id="p-name" value="${profile?.name || ""}" required placeholder="e.g. Office Wi-Fi"></label>
         <label class="field"><span>Identifier</span><input type="text" id="p-ident" class="code" value="${profile?.identifier || ""}" ${isNew ? "" : "disabled"} placeholder="Generated if left blank"></label></div>
         <label class="field"><span>Description</span><input type="text" id="p-desc" value="${profile?.description || ""}" placeholder="Shown on the device in Settings"></label>
         ${builder ? html`<p class="hint" style="margin:0">Text fields accept variables, filled in per device: ${sch.variables.slice(0, 8).map((v) => html`<span class="kbd">{{${v}}}</span> `)}and more.</p>` : ""}
       </section>
       ${builder ? html`<div id="payloads"></div>${editable ? html`<div><button class="btn" id="add">Add payload</button></div>` : ""}`
-        : html`<section class="panel panel-pad"><p style="margin-top:0">This profile was uploaded. Its contents: ${profile.payload_types.map((t) => html`<span class="tag">${short(t)}</span>`)}</p>${editable ? html`<button class="btn" id="replace">Replace file</button>` : ""}</section>`}
+        : html`<section class="panel panel-pad"><p style="margin-top:0">This profile was uploaded. Its contents: ${profile.payload_types.map((t) => html`<span class="tag">${typeName(t)}</span>`)}</p>${editable ? html`<button class="btn" id="replace">Replace file</button>` : ""}</section>`}
       ${!isNew ? html`<section id="assign"></section><section class="panel" id="status"></section>
         <details class="panel panel-pad"><summary><strong>Profile XML</strong> <span class="hint">(unsigned, before variables are filled in)</span></summary><pre class="code" style="margin-top:10px">${xml}</pre></details>` : ""}
     </div>`.s;
@@ -241,8 +253,8 @@ async function editor({ root, params, navigate, refresh }) {
     const cats = [...new Set(sch.items.map((s) => s.category))];
     const ctl = modal({ title: "Add payload", wide: true, body: html`${cats.map((c) => html`<div class="section-label">${c}</div><div class="picker">${sch.items.filter((s) => s.category === c).map((s) => {
       const taken = s.unique && state.payloads.some((p) => p.type === s.type);
-      return html`<button type="button" data-type="${s.type}" ${taken ? "disabled" : ""}>${s.name}${s.supervised ? html`<span class="sup">supervised</span>` : ""}${!s.user_enrollment && !s.supervised ? html`<span class="sup">not on personal devices</span>` : ""}<small>${taken ? "Already in this profile" : s.description || short(s.type)}</small></button>`;
-    })}</div>`)}`, actions: [{ id: "c", label: "Cancel" }] });
+      return html`<button type="button" data-type="${s.type}" ${taken ? "disabled" : ""}><span>${s.name}${s.supervised ? html`<span class="sup">supervised</span>` : ""}${!s.user_enrollment && !s.supervised ? html`<span class="sup">not on BYOD</span>` : ""}</span><small>${taken ? "Already in this profile" : s.description || short(s.type)}</small></button>`;
+    })}</div>`)}` });
     ctl.el.addEventListener("click", (e) => {
       const b = e.target.closest("[data-type]");
       if (!b || b.disabled) return;

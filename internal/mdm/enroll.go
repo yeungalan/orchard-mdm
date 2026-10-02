@@ -27,7 +27,7 @@ func randomToken(n int) string { return pki.RandomToken(n) }
 
 // EnrollmentOptions controls enrollment profile generation.
 type EnrollmentOptions struct {
-	// Ref records how the device enrolled: "token:<id>", "ade", "manual" or "renew:<udid>".
+	// Ref records how the device enrolled: "token:<id>", "ade", "manual", "account:<id>" or "renew:<udid>".
 	Ref string
 	// ChallengeTTL is how long the embedded SCEP challenge stays valid.
 	ChallengeTTL time.Duration

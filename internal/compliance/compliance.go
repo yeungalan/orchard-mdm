@@ -184,7 +184,9 @@ func (e *Engine) Check(d *store.Device, p *store.CompliancePolicy) PolicyResult 
 func (e *Engine) Evaluate(d *store.Device) Result {
 	res := Result{State: "compliant", Reasons: []string{}, Policies: []PolicyResult{}}
 	policies, _ := e.policiesFor(d.UDID)
-	if d.LastInventory == 0 && d.LastSeen == 0 {
+	if d.LastInventory == 0 || len(d.Security) == 0 {
+		// wait for the first full inventory; evaluating earlier reports
+		// devices as failing just because they haven't told us anything yet
 		res.State = "unknown"
 		return res
 	}
@@ -252,7 +254,7 @@ func (e *Engine) EvaluateDevice(udid string) *Result {
 			level = "warn"
 		}
 		_ = e.store.InsertEvent(&store.Event{DeviceID: udid, Type: "compliance.changed", Level: level,
-			Message: fmt.Sprintf("Compliance changed from %s to %s", d.Compliance, res.State), Details: strings.Join(res.Reasons, "\n")})
+			Message: complianceMessage(d.Compliance, res.State), Details: strings.Join(res.Reasons, "\n")})
 		e.bus.Publish(events.ComplianceChanged, udid, map[string]any{"previous": d.Compliance, "state": res.State, "reasons": res.Reasons,
 			"device_name": d.DeviceName, "serial_number": d.SerialNumber})
 	}
@@ -313,4 +315,19 @@ func (e *Engine) EvaluateAll() {
 	for _, u := range udids {
 		e.EvaluateDevice(u)
 	}
+}
+
+var stateLabels = map[string]string{"compliant": "compliant", "noncompliant": "not compliant", "grace": "in its grace period", "unknown": "not evaluated"}
+
+func complianceMessage(from, to string) string {
+	label := func(s string) string {
+		if l, ok := stateLabels[s]; ok {
+			return l
+		}
+		return s
+	}
+	if from == "" || from == "unknown" {
+		return "Compliance evaluated: " + label(to)
+	}
+	return fmt.Sprintf("Now %s (was %s)", label(to), label(from))
 }

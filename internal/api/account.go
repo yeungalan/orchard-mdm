@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yeungalan/orchard-mdm/internal/portal"
+	"github.com/yeungalan/orchard-mdm/internal/store"
 )
 
 type accountConfigView struct {
@@ -34,9 +35,22 @@ func (a *API) accountEnrollment(w http.ResponseWriter, r *http.Request, p *Princ
 	if view.GroupIDs == nil {
 		view.GroupIDs = []int64{}
 	}
-	recent, err := a.Store.ListAccountEnrollments(50)
+	list, err := a.Store.ListAccountEnrollments(50)
 	if err != nil {
 		return err
+	}
+	type signIn struct {
+		*store.AccountEnrollment
+		DeviceName string `json:"device_name,omitempty"`
+	}
+	recent := make([]signIn, len(list))
+	for i, e := range list {
+		recent[i] = signIn{AccountEnrollment: e}
+		if e.DeviceID != "" {
+			if d, err := a.Store.GetDevice(e.DeviceID); err == nil {
+				recent[i].DeviceName = d.DeviceName
+			}
+		}
 	}
 	servers, _ := a.Store.ListDEPServers()
 	type ade struct {

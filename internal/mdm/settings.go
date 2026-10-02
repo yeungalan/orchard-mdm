@@ -34,6 +34,7 @@ const (
 	SettingPortalWebClipID     = "portal_webclip_identifier"
 	SettingCommandExpiryDays   = "command_expiry_days"
 	SettingRecordConnectionIPs = "record_connection_ips"
+	SettingAgentReportSeconds  = "portal_agent_report_seconds"
 )
 
 // SettingDefaults are applied when a key is unset.
@@ -51,6 +52,7 @@ var SettingDefaults = map[string]string{
 	SettingADESyncMinutes:      "30",
 	SettingCommandExpiryDays:   "30",
 	SettingRecordConnectionIPs: "1",
+	SettingAgentReportSeconds:  "900",
 }
 
 // Setting returns a setting with its default applied.

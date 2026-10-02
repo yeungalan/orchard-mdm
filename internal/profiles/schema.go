@@ -51,7 +51,7 @@ func opts(pairs ...any) []Option {
 }
 
 var proxyFields = []Field{
-	{Key: "ProxyType", Label: "Proxy", Type: "enum", Default: "None", Options: opts("None", "None", "Manual", "Manual", "Auto", "Automatic (PAC)"), Section: "Proxy"},
+	{Key: "ProxyType", Label: "Type", Type: "enum", Default: "None", Options: opts("None", "None", "Manual", "Manual", "Auto", "Automatic (PAC)"), Section: "Proxy"},
 	{Key: "ProxyServer", Label: "Proxy server", Type: "string", Section: "Proxy", ShowIf: map[string][]any{"ProxyType": {"Manual"}}},
 	{Key: "ProxyServerPort", Label: "Proxy port", Type: "int", Section: "Proxy", ShowIf: map[string][]any{"ProxyType": {"Manual"}}},
 	{Key: "ProxyUsername", Label: "Proxy username", Type: "string", Section: "Proxy", ShowIf: map[string][]any{"ProxyType": {"Manual"}}},
@@ -335,7 +335,7 @@ var Schemas = []Schema{
 			{Key: "AccountName", Label: "Name", Type: "string", Help: "{{user.name}}"},
 			{Key: "EmailAddress", Label: "Email address", Type: "string", Required: true, Help: "{{user.email}}"},
 		}},
-	{Type: "com.apple.caldav.account", Name: "Calendar (CalDAV)", Category: "Accounts",
+	{Type: "com.apple.caldav.account", Name: "Calendar (CalDAV)", Category: "Accounts", Description: "Add a CalDAV calendar account.",
 		Fields: []Field{
 			{Key: "CalDAVAccountDescription", Label: "Description", Type: "string"},
 			{Key: "CalDAVHostName", Label: "Server", Type: "string", Required: true},
@@ -345,7 +345,7 @@ var Schemas = []Schema{
 			{Key: "CalDAVPassword", Label: "Password", Type: "password"},
 			{Key: "CalDAVUseSSL", Label: "Use SSL", Type: "bool", Default: true},
 		}},
-	{Type: "com.apple.carddav.account", Name: "Contacts (CardDAV)", Category: "Accounts",
+	{Type: "com.apple.carddav.account", Name: "Contacts (CardDAV)", Category: "Accounts", Description: "Add a CardDAV contacts account.",
 		Fields: []Field{
 			{Key: "CardDAVAccountDescription", Label: "Description", Type: "string"},
 			{Key: "CardDAVHostName", Label: "Server", Type: "string", Required: true},
@@ -355,7 +355,7 @@ var Schemas = []Schema{
 			{Key: "CardDAVPassword", Label: "Password", Type: "password"},
 			{Key: "CardDAVUseSSL", Label: "Use SSL", Type: "bool", Default: true},
 		}},
-	{Type: "com.apple.subscribedcalendar.account", Name: "Subscribed calendar", Category: "Accounts",
+	{Type: "com.apple.subscribedcalendar.account", Name: "Subscribed calendar", Category: "Accounts", Description: "Subscribe to a read-only calendar (.ics URL).",
 		Fields: []Field{
 			{Key: "SubCalAccountDescription", Label: "Description", Type: "string"},
 			{Key: "SubCalAccountHostName", Label: "Calendar URL", Type: "string", Required: true},
@@ -363,7 +363,7 @@ var Schemas = []Schema{
 			{Key: "SubCalAccountPassword", Label: "Password", Type: "password"},
 			{Key: "SubCalAccountUseSSL", Label: "Use SSL", Type: "bool", Default: true},
 		}},
-	{Type: "com.apple.ldap.account", Name: "LDAP directory", Category: "Accounts",
+	{Type: "com.apple.ldap.account", Name: "LDAP directory", Category: "Accounts", Description: "Look up people in a company directory.",
 		Fields: []Field{
 			{Key: "LDAPAccountDescription", Label: "Description", Type: "string"},
 			{Key: "LDAPAccountHostName", Label: "Server", Type: "string", Required: true},
@@ -478,14 +478,14 @@ var Schemas = []Schema{
 			{Key: "PayloadContent.Retries", Label: "Retries", Type: "int"},
 			{Key: "PayloadContent.RetryDelay", Label: "Retry delay (seconds)", Type: "int"},
 		}},
-	{Type: "com.apple.airplay", Name: "AirPlay", Category: "Other", Unique: true,
+	{Type: "com.apple.airplay", Name: "AirPlay", Category: "Other", Unique: true, Description: "Saved AirPlay passwords and allowed destinations.",
 		Fields: []Field{
 			{Key: "AllowList", Label: "Allowed destinations (supervised)", Type: "dictlist", Fields: []Field{{Key: "DeviceID", Label: "Device ID (MAC)", Type: "string", Required: true}}},
 			{Key: "Passwords", Label: "Destination passwords", Type: "dictlist", Fields: []Field{
 				{Key: "DeviceName", Label: "Device name", Type: "string", Required: true},
 				{Key: "Password", Label: "Password", Type: "password", Required: true}}},
 		}},
-	{Type: "com.apple.airprint", Name: "AirPrint", Category: "Other", Unique: true,
+	{Type: "com.apple.airprint", Name: "AirPrint", Category: "Other", Unique: true, Description: "Add printers that are on another network.",
 		Fields: []Field{
 			{Key: "AirPrint", Label: "Printers", Type: "dictlist", Fields: []Field{
 				{Key: "IPAddress", Label: "IP address / host", Type: "string", Required: true},
@@ -494,7 +494,7 @@ var Schemas = []Schema{
 				{Key: "ForceTLS", Label: "Require TLS", Type: "bool", Default: false},
 			}},
 		}},
-	{Type: "com.apple.font", Name: "Font", Category: "Other",
+	{Type: "com.apple.font", Name: "Font", Category: "Other", Description: "Install a TrueType or OpenType font.",
 		Fields: []Field{
 			{Key: "Name", Label: "Font name", Type: "string"},
 			{Key: "Font", Label: "Font file (TTF/OTF)", Type: "data", Required: true},

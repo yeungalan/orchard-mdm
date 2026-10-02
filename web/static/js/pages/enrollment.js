@@ -70,7 +70,7 @@ function accountSection(acct, gname) {
     ${acct.recent.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Signed in</th><th>Work account</th><th>Method</th><th>Device</th></tr></thead><tbody>
       ${acct.recent.slice(0, 15).map((a) => html`<tr><td class="nowrap">${ago(a.created_at)}</td><td>${a.managed_apple_id}${a.display_name && a.display_name !== a.managed_apple_id.split("@")[0] ? html`<span class="cell-sub">${a.display_name}</span>` : ""}</td>
         <td>${a.auth_method === "sso" ? "Single sign-on" : "Enrollment code"}<span class="cell-sub">${a.mode === "adde" ? "Device enrollment" : "User Enrollment"}</span></td>
-        <td>${a.device_id ? html`<a href="#/devices/${encodeURIComponent(a.device_id)}">${modelLabel(a.product) || "View device"}</a>` : a.profile_issued_at ? html`<span class="muted">Profile downloaded, not enrolled yet</span>` : html`<span class="muted">Signed in only</span>`}</td></tr>`)}
+        <td>${a.device_id ? html`<a href="#/devices/${encodeURIComponent(a.device_id)}">${a.device_name || modelLabel(a.product) || "View device"}</a>` : a.profile_issued_at ? html`<span class="muted">Profile downloaded, not enrolled yet</span>` : html`<span class="muted">Signed in only</span>`}</td></tr>`)}
     </tbody></table></div>` : ""}
   </section>`;
 }

@@ -28,16 +28,16 @@ export async function render({ root, navigate }) {
     </section>
     <section class="panel" id="orchard"></section>
     <div class="grid-3" style="margin-top:16px">
-      <section class="panel"><div class="panel-head"><h2>Compliance</h2><a class="hint" href="#/compliance">Policies</a></div><div class="panel-pad">${statusStack(d.compliance)}</div></section>
+      <section class="panel"><div class="panel-head"><h2>Compliance</h2><a class="hint" href="#/compliance">Policies</a></div><div class="panel-pad">${statusStack(d.compliance)}${topIssues(devs.items)}</div></section>
       <section class="panel"><div class="panel-head"><h2>iOS versions</h2></div><div class="panel-pad">${barList(d.os_versions, { href: (i) => `#/devices?os=${encodeURIComponent(i.key)}` })}</div></section>
       <section class="panel"><div class="panel-head"><h2>Models</h2></div><div class="panel-pad">${barList(d.models.map((m) => ({ ...m, label: modelLabel(m.key) })), { href: (i) => `#/devices?model=${encodeURIComponent(i.key)}` })}</div></section>
     </div>
-    <div class="grid-2" style="margin-top:16px">
+    <div class="grid-2" style="margin-top:16px;align-items:start">
       <section class="panel"><div class="panel-head"><h2>Needs a look</h2></div>
         ${attention(d.attention)}
       </section>
       <section class="panel"><div class="panel-head"><h2>Recent activity</h2><a class="hint" href="#/activity">All activity</a></div>
-        <ul class="timeline panel-pad" style="padding-top:4px">${d.recent_events.length ? d.recent_events.map((e) => html`<li><time>${ago(e.ts)}</time><div class="${e.level === "warn" ? "lvl-warn" : ""}">${e.device_id ? html`<a href="#/devices/${encodeURIComponent(e.device_id)}">${e.device_name || "Device"}</a>: ` : ""}${e.message}</div></li>`) : html`<li><span></span><span class="hint">Nothing has happened yet.</span></li>`}</ul>
+        <ul class="timeline panel-pad" style="padding-top:4px">${d.recent_events.length ? d.recent_events.slice(0, 10).map((e) => html`<li><time>${ago(e.ts)}</time><div class="${e.level === "warn" ? "lvl-warn" : ""}">${e.device_id ? html`<a href="#/devices/${encodeURIComponent(e.device_id)}">${e.device_name || "Device"}</a>: ` : ""}${e.message}</div></li>`) : html`<li><span></span><span class="hint">Nothing has happened yet.</span></li>`}</ul>
       </section>
     </div>`.s;
   orchardGrid($("#orchard", root), devs.items, { onPick: (u) => navigate("/devices/" + encodeURIComponent(u)) });
@@ -50,5 +50,22 @@ function attention(a) {
   for (const d of a.low_storage) rows.push([d, `${d.available_gb.toFixed(1)} GB free`]);
   for (const d of a.stale) rows.push([d, `Last seen ${ago(d.last_seen)}`]);
   if (!rows.length) return html`<p class="hint panel-pad" style="margin:0">No devices are low on battery or storage, lost, or out of touch.</p>`;
-  return html`<div class="table-wrap"><table class="table"><tbody>${rows.slice(0, 12).map(([d, why]) => html`<tr><td><a class="primary" href="#/devices/${encodeURIComponent(d.udid)}">${deviceName(d)}</a><span class="cell-sub">${d.product_name}</span></td><td>${why}</td><td class="right">${complianceChip(d.compliance)}</td></tr>`)}</tbody></table></div>`;
+  return html`<div class="table-wrap"><table class="table"><tbody>${rows.slice(0, 12).map(([d, why]) => html`<tr><td><a class="primary" href="#/devices/${encodeURIComponent(d.udid)}">${deviceName(d)}</a><span class="cell-sub">${modelLabel(d.product_name)}</span></td><td>${why}</td><td class="right">${complianceChip(d.compliance)}</td></tr>`)}</tbody></table></div>`;
+}
+
+// The most common reasons devices fail compliance (policy name stripped).
+function topIssues(devices) {
+  const counts = new Map();
+  for (const d of devices) {
+    for (const r of d.compliance_reasons || []) {
+      const reason = r.includes(": ") ? r.slice(r.indexOf(": ") + 2) : r;
+      const key = reason.replace(/^(Only )?[\d.]+ GB free \(minimum [\d.]+ GB\)$/, "Low free storage").replace(/^OS [\d.]+ is older than the minimum ([\d.]+)$/, "iOS older than $1")
+        .replace(/^Blocked app installed: .*/, "Blocked app installed");
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  if (!counts.size) return html`<p class="hint" style="margin-bottom:0">No device is failing a policy.</p>`;
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  return html`<h3 style="margin:22px 0 6px;font-size:14px">Most common issues</h3>
+    <ul class="issues">${top.map(([k, n]) => html`<li><span>${k}</span><b>${plural(n, "device")}</b></li>`)}</ul>`;
 }

@@ -10,13 +10,13 @@ export function barList(items, { total, format = (v) => v.toLocaleString(), href
   const max = Math.max(...items.map((i) => i.count), 1);
   const sum = total || items.reduce((a, i) => a + i.count, 0);
   return html`<div class="bars">${items.map((i) => {
-    const w = Math.max(1, (i.count / max) * 100);
+    const w = Math.max(0.01, i.count / max);
     const share = sum ? Math.round((i.count / sum) * 100) : 0;
     const text = i.label || i.key;
     const label = href ? html`<a href="${href(i)}">${text}</a>` : text;
     return html`<div class="bar-row" title="${i.label || i.key}: ${format(i.count)} (${share}%)">
       <span class="b-label">${label}</span>
-      <span class="bar-track"><span class="bar-fill" style="width:calc(${w.toFixed(1)}% - 48px)"></span><span class="bar-val">${format(i.count)}</span></span>
+      <span class="bar-track"><span class="bar-fill" style="width:calc((100% - 52px) * ${w.toFixed(3)})"></span><span class="bar-val">${format(i.count)}</span></span>
     </div>`;
   })}</div>`;
 }

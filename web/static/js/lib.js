@@ -183,7 +183,7 @@ export function modal({ title, body, actions = [], wide = false, onOpen }) {
   const dlg = document.createElement("dialog");
   if (wide) dlg.classList.add("wide");
   dlg.innerHTML = html`<form method="dialog" class="dlg-form" novalidate>
-      <div class="dlg-head"><h2>${title}</h2><button class="btn btn-ghost btn-sm" value="cancel" formnovalidate aria-label="Close">Close</button></div>
+      <div class="dlg-head"><h2>${title}</h2><button class="dlg-x" value="cancel" formnovalidate aria-label="Close" title="Close">${icons.close}</button></div>
       <div class="dlg-body">${body}</div>
       ${actions.length ? html`<div class="dlg-foot">${actions.map((a) => html`<button type="${a.submit ? "submit" : "button"}" class="btn ${a.kind ? "btn-" + a.kind : ""}" data-act="${a.id}">${a.label}</button>`)}</div>` : ""}
     </form>`.s;
@@ -257,6 +257,7 @@ export function debounce(fn, ms = 250) {
 
 export const icons = {
   search: raw('<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M13.5 13.5 18 18"/></svg>'),
+  close: raw('<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>'),
 };
 
 export function emptyState(title, text, action) {

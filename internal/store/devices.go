@@ -370,7 +370,7 @@ func (s *Store) ListDevices(f DeviceFilter) ([]*Device, int, error) {
 	if f.Sort != "" && !f.Desc {
 		dir = " ASC"
 	}
-	q := `SELECT ` + deviceCols + ` FROM devices` + cond + ` ORDER BY ` + order + dir + `, udid`
+	q := `SELECT ` + deviceCols + ` FROM devices` + cond + ` ORDER BY ` + order + dir + `, device_name COLLATE NOCASE, udid`
 	if f.Limit > 0 {
 		q += fmt.Sprintf(" LIMIT %d OFFSET %d", f.Limit, f.Offset)
 	}

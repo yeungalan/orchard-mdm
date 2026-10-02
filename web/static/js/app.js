@@ -80,6 +80,8 @@ async function route() {
     if (a.hasAttribute("aria-current")) a.setAttribute("aria-current", "page");
   }
   $(".side")?.classList.remove("open");
+  // dialogs belong to the page that opened them
+  for (const d of $$("dialog[open]")) d.close();
   if (typeof cleanup === "function") { try { cleanup(); } catch {} }
   cleanup = null;
   if (!m) {
@@ -147,13 +149,15 @@ function shell() {
     applyTheme(next);
     e.target.textContent = "Theme: " + next;
   });
-  $("#menu-btn").addEventListener("click", () => $(".side").classList.toggle("open"));
+  $("#menu-btn").addEventListener("click", (e) => { e.stopPropagation(); $(".side").classList.toggle("open"); });
+  // tapping outside the open mobile menu closes it
+  document.addEventListener("click", (e) => { const side = $(".side"); if (side?.classList.contains("open") && !side.contains(e.target)) side.classList.remove("open"); });
   route();
 }
 
 function authPage(title, sub, body) {
   document.getElementById("app").innerHTML = html`<div class="login"><div class="login-card">
-    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true" width="40" height="40"><use href="/static/icon.svg#mark"/></svg><span><b style="font-size:22px">Orchard MDM</b><small>${session.org || ""}</small></span></div>
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true" width="40" height="40"><use href="/static/icon.svg#mark"/></svg><span><b style="font-size:22px">Orchard MDM</b>${session.org && session.org !== "Orchard MDM" ? html`<small>${session.org}</small>` : ""}</span></div>
     <div class="panel panel-pad"><h1 style="font-size:21px;margin:0 0 6px">${title}</h1><p class="hint" style="margin:0 0 16px">${sub}</p>${body}</div>
   </div></div>`.s;
 }

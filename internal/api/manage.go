@@ -626,6 +626,7 @@ type appView struct {
 	Assignments int            `json:"assignments"`
 	Installed   int            `json:"installed"`
 	States      map[string]int `json:"states"`
+	Available   bool           `json:"available"` // offered in the Company Portal to at least one group
 }
 
 func (a *API) listApps(w http.ResponseWriter, r *http.Request, p *Principal) error {
@@ -642,7 +643,11 @@ func (a *API) listApps(w http.ResponseWriter, r *http.Request, p *Principal) err
 		for _, st := range states {
 			sc[st.Status]++
 		}
-		out = append(out, appView{app, len(as), counts[app.BundleID], sc})
+		avail := false
+		for _, x := range as {
+			avail = avail || x.Intent == "available"
+		}
+		out = append(out, appView{app, len(as), counts[app.BundleID], sc, avail})
 	}
 	return ok(w, map[string]any{"items": out})
 }

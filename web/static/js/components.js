@@ -72,7 +72,7 @@ export async function commandDialog(udids, { only, preselect, onDone, supervised
     ${cat.categories.map((c) => {
       const items = specs.filter((s) => s.category === c);
       if (!items.length) return "";
-      return html`<div class="section-label">${c}</div><div class="picker">${items.map((s) => html`<button type="button" data-spec="${s.id}">${s.label}${s.supervised ? html`<span class="sup">supervised</span>` : ""}<small>${s.description}</small></button>`)}</div>`;
+      return html`<div class="section-label">${c}</div><div class="picker">${items.map((s) => html`<button type="button" data-spec="${s.id}"><span>${s.label}${s.supervised ? html`<span class="sup">supervised</span>` : ""}</span><small>${s.description}</small></button>`)}</div>`;
     })}`;
   const formView = (s) => html`<p style="margin-top:0"><strong>${s.label}</strong>${s.supervised ? html` <span class="sup">supervised devices only</span>` : ""}</p><p class="hint">${s.description}</p>
     ${s.params?.length ? s.params.map((p) => paramInput(p, refs)) : html`<p>This command has no options.</p>`}
@@ -82,6 +82,7 @@ export async function commandDialog(udids, { only, preselect, onDone, supervised
     $("#cmd-body", ctl.el).innerHTML = listView().s;
     $('[data-act="send"]', ctl.el).style.display = "none";
     $('[data-act="back"]', ctl.el).style.display = "none";
+    $(".dlg-foot", ctl.el).style.display = "none";
   };
   const ctl = modal({
     title: bulk ? "Send command to devices" : "Send command",
@@ -115,6 +116,7 @@ export async function commandDialog(udids, { only, preselect, onDone, supervised
     $("#cmd-body", ctl.el).innerHTML = formView(current).s;
     $('[data-act="send"]', ctl.el).style.display = "";
     $('[data-act="back"]', ctl.el).style.display = only && only.length === 1 ? "none" : "";
+    $(".dlg-foot", ctl.el).style.display = "";
   };
   $("#cmd-body", ctl.el).addEventListener("click", (e) => { const b = e.target.closest("[data-spec]"); if (b) showForm(b.dataset.spec); });
   if (preselect) showForm(preselect);

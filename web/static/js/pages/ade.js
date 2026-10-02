@@ -8,8 +8,7 @@ export async function render({ root, refresh }) {
     Connect Apple Business Manager (or Apple School Manager) to use it.</p></div>
     ${can("admin") ? html`<div class="actions"><button class="btn btn-primary" id="add-srv">Connect Apple Business Manager</button></div>` : ""}</div>
     ${srv.items.length ? srv.items.map((s) => serverCard(s, profs.items)) : html`<section class="panel">${emptyState("Not connected yet", "Connect an Apple Business Manager MDM server to sync your organization's devices.")}</section>`}
-    <h2 class="section">Setup Assistant profiles</h2>
-    <section class="panel"><div class="panel-head"><h2>Profiles</h2>${can("manage") ? html`<button class="btn btn-sm" id="add-prof">New profile</button>` : ""}</div>
+    <section class="panel" style="margin-top:28px"><div class="panel-head"><h2>Setup Assistant profiles</h2>${can("manage") ? html`<button class="btn btn-sm" id="add-prof">New profile</button>` : ""}</div>
       ${profs.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Profile</th><th>Supervised</th><th>Removable</th><th>Skipped screens</th><th>Groups</th><th></th></tr></thead><tbody>
       ${profs.items.map((p) => html`<tr><td><strong>${p.name}</strong></td><td>${p.config.is_supervised === false ? "No" : "Yes"}</td><td>${p.config.is_mdm_removable ? "Yes" : "No"}</td>
         <td>${(p.config.skip_setup_items || []).length}</td><td>${p.group_ids.map((id) => html`<span class="tag">${gs.find((g) => g.id === id)?.name || id}</span>`)}</td>

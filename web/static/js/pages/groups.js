@@ -1,4 +1,4 @@
-import { html, $, $$, api, can, ago, deviceName, complianceChip, modal, toast, toastError, confirmDialog, plural, emptyState } from "../lib.js";
+import { html, $, $$, api, can, ago, deviceName, modelLabel, complianceChip, modal, toast, toastError, confirmDialog, plural, emptyState } from "../lib.js";
 import { invalidateGroups, pickDevices, intentLabel } from "../components.js";
 
 const KIND = { all: "Built in", static: "Static", dynamic: "Dynamic" };
@@ -78,17 +78,20 @@ function readGroup(el, g) {
 }
 
 async function detail({ root, params, navigate, refresh }) {
-  const [res, members] = await Promise.all([api.get(`/api/groups/${params.id}`), api.get(`/api/groups/${params.id}/members?limit=1000`)]);
+  const [res, members, meta] = await Promise.all([api.get(`/api/groups/${params.id}`), api.get(`/api/groups/${params.id}/members?limit=1000`), ruleMeta()]);
+  const short = (l) => l.replace(/ \(.*\)$/, "");
+  const fieldLabel = Object.fromEntries(meta.fields.map((f) => [f.id, short(f.label)]));
+  const opLabel = Object.fromEntries(meta.ops.map((o) => [o.id, short(o.label)]));
   const g = res.group;
   const link = { profile: "#/profiles/", app: "#/apps/", declaration: "#/declarations/", compliance: "#/compliance/" };
   const typeLabel = { profile: "Profile", app: "App", declaration: "Declaration", compliance: "Compliance policy" };
   root.innerHTML = html`<div class="crumb"><a href="#/groups">Groups</a></div>
     <div class="page-head"><div><h1>${g.name}</h1><p class="sub">${g.description || KIND[g.kind] + " group"}</p></div>
       ${can("manage") ? html`<div class="actions">${g.kind === "static" ? html`<button class="btn btn-primary" id="add">Add devices</button>` : ""}<button class="btn" id="edit">Edit</button>${g.kind !== "all" ? html`<button class="btn btn-danger" id="del">Delete</button>` : ""}</div>` : ""}</div>
-    ${g.kind === "dynamic" ? html`<div class="callout"><p>Devices join when they match ${g.rules?.match === "any" ? "any" : "all"} of: ${(g.rules?.rules || []).map((r, i) => html`${i ? ", " : ""}<strong>${r.field.replace("_", " ")}</strong> ${r.op} “${r.value}”`)}.</p></div>` : ""}
-    <div class="grid-2">
+    ${g.kind === "dynamic" ? html`<div class="callout"><p>Devices join when they match ${g.rules?.match === "any" ? "any" : "all"} of these rules:</p><ul class="rules">${(g.rules?.rules || []).map((r) => html`<li><strong>${fieldLabel[r.field] || r.field}</strong> ${(opLabel[r.op] || r.op).toLowerCase()} <span class="kbd">${r.value}</span></li>`)}</ul></div>` : ""}
+    <div class="grid-2 top">
       <section class="panel"><div class="panel-head"><h2>Members</h2><span class="hint">${plural(members.total, "device")}</span></div>
-        ${members.items.length ? html`<div class="table-wrap" style="max-height:560px"><table class="table"><tbody>${members.items.map((d) => html`<tr><td><a class="primary" href="#/devices/${encodeURIComponent(d.udid)}">${deviceName(d)}</a><span class="cell-sub">${d.product_name}<span class="ident">${d.serial_number}</span></span></td>
+        ${members.items.length ? html`<div class="table-wrap" style="max-height:560px"><table class="table"><tbody>${members.items.map((d) => html`<tr><td><a class="primary" href="#/devices/${encodeURIComponent(d.udid)}">${deviceName(d)}</a><span class="cell-sub">${modelLabel(d.product_name)}<span class="ident">${d.serial_number}</span></span></td>
           <td>${complianceChip(d.compliance)}</td><td class="right">${g.kind === "static" && can("manage") ? html`<button class="link-btn link-danger" data-rm="${d.udid}">Remove</button>` : ""}</td></tr>`)}</tbody></table></div>`
           : html`<p class="hint panel-pad" style="margin:0">${g.kind === "static" ? "Add devices to this group by hand, or from the device list." : "No devices match yet."}</p>`}</section>
       <section class="panel"><div class="panel-head"><h2>Assigned to this group</h2></div>

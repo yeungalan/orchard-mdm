@@ -87,7 +87,7 @@ function manageDialog(udid, d, data, reload, navigate) {
           <dt>Activation Lock bypass</dt><dd>${s.activation_lock_bypass ? html`<span class="ident">${s.activation_lock_bypass}</span>` : html`<span class="muted">Not retrieved yet. Send “Activation Lock bypass code” (supervised devices).</span>`}</dd>
           <dt>Unlock token escrowed</dt><dd>${yes(s.has_unlock_token)} <span class="hint">(lets you clear a forgotten passcode)</span></dd>
           <dt>Companion app token</dt><dd><span class="ident">${s.agent_token}</span></dd>
-          <dt>Company Portal link</dt><dd><a href="${s.portal_url}" target="_blank" rel="noopener">${s.portal_url}</a></dd></dl>`, actions: [{ id: "c", label: "Close" }] });
+          <dt>Company Portal link</dt><dd><a href="${s.portal_url}" target="_blank" rel="noopener">${s.portal_url}</a></dd></dl>` });
         return false;
       }],
       ...(d.user_enrollment ? [] : [["renew", "Renew device identity", `Issue a new identity certificate (current one expires ${fmtDate(d.cert_not_after)}).`, () => run("renew-identity", "Identity renewal sent", ["Renew the identity certificate?", "A fresh enrollment profile is installed silently to replace the device certificate.", "Renew"])]]),
@@ -98,8 +98,7 @@ function manageDialog(udid, d, data, reload, navigate) {
     );
   }
   const ctl = modal({ title: "Manage device", body: html`<div class="picker">${items.map(([id, label, desc]) => html`<button type="button" data-m="${id}">${label}<small>${desc}</small></button>`)}</div>
-    <p class="hint" style="margin-top:14px">Orchard MDM deliberately has no remote wipe: the enrollment profile does not grant the erase right, and erase commands are refused.</p>`,
-    actions: [{ id: "c", label: "Close" }] });
+    <p class="hint" style="margin-top:14px">Orchard MDM deliberately has no remote wipe: the enrollment profile does not grant the erase right, and erase commands are refused.</p>` });
   $$("[data-m]", ctl.el).forEach((b) => b.addEventListener("click", async () => {
     const item = items.find((i) => i[0] === b.dataset.m);
     const keep = await item[3]();
@@ -201,17 +200,23 @@ async function telemetry(host, d, data, { udid }) {
       <section class="panel"><div class="panel-head"><h2>Battery level</h2><span class="hint">${plural(battery.length, "reading")}</span></div><div class="panel-pad"><div id="c-bat"></div></div></section>
       <section class="panel"><div class="panel-head"><h2>Free storage</h2><span class="hint">${plural(storage.length, "reading")}</span></div><div class="panel-pad"><div id="c-sto"></div></div></section></div>
       <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>Networks seen</h2><span class="hint">Public IPs come from check-ins; Wi-Fi names need the companion app</span></div>
-        ${t.networks.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Type</th><th>Network</th><th>First seen</th><th>Last seen</th><th class="num">Samples</th></tr></thead><tbody>
+        ${t.networks.length ? html`<div class="table-wrap"><table class="table capped"><thead><tr><th>Type</th><th>Network</th><th>First seen</th><th>Last seen</th><th class="num">Samples</th></tr></thead><tbody>
           ${t.networks.map((n) => html`<tr><td>${{ ip: "Public IP", ssid: "Wi-Fi", carrier: "Carrier" }[n.kind]}</td><td class="${n.kind === "ip" ? "ident" : ""}">${n.value}</td><td>${fmtTime(n.first_seen)}</td><td>${fmtTime(n.last_seen)}</td><td class="num">${n.count}</td></tr>`)}
-        </tbody></table></div>` : html`<p class="hint panel-pad" style="margin:0">No network information recorded in this period.</p>`}</section>
-      <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>Recent samples</h2></div><div class="table-wrap"><table class="table">
+        </tbody></table></div>${showAll(t.networks.length, "network")}` : html`<p class="hint panel-pad" style="margin:0">No network information recorded in this period.</p>`}</section>
+      <section class="panel" style="margin-top:16px"><div class="panel-head"><h2>Recent samples</h2></div><div class="table-wrap"><table class="table capped">
         <thead><tr><th>Time</th><th>Source</th><th class="num">Battery</th><th class="num">Free</th><th>Wi-Fi</th><th>IP</th><th>Carrier</th></tr></thead>
         <tbody>${t.items.slice(-40).reverse().map((s) => html`<tr><td class="nowrap">${fmtTime(s.ts)}</td><td>${{ mdm: "MDM inventory", server: "Check-in", agent: "Companion app", ddm: "Status report" }[s.source] || s.source}</td>
-          <td class="num">${s.battery >= 0 ? pct(s.battery) : "—"}</td><td class="num">${s.available_gb >= 0 ? gb(s.available_gb) : "—"}</td><td>${v(s.ssid)}</td><td class="ident">${v(s.ip)}</td><td>${v(s.carrier)}${s.roaming ? " (roaming)" : ""}</td></tr>`)}</tbody></table></div></section>`.s;
+          <td class="num">${s.battery >= 0 ? pct(s.battery) : "—"}</td><td class="num">${s.available_gb >= 0 ? gb(s.available_gb) : "—"}</td><td>${v(s.ssid)}</td><td class="ident">${v(s.ip)}</td><td>${v(s.carrier)}${s.roaming ? " (roaming)" : ""}</td></tr>`)}</tbody></table></div>${showAll(Math.min(t.items.length, 40), "sample")}</section>`.s;
     lineChart($("#c-bat", tel), battery, { yMax: 100, format: (x) => `${Math.round(x)}%`, label: "Battery" });
     lineChart($("#c-sto", tel), storage, { format: (x) => `${x >= 10 || x === 0 ? Math.round(x) : x.toFixed(1)} GB`, label: "Free storage" });
   };
   $("#hours", host).addEventListener("change", load);
+  host.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-showall]");
+    if (!b) return;
+    b.closest(".panel").querySelector("table.capped")?.classList.remove("capped");
+    b.parentElement.remove();
+  });
   $("#sample", host)?.addEventListener("click", async () => {
     try { await api.post(`/api/devices/${encodeURIComponent(udid)}/actions/telemetry`); toast("Sample requested. It appears here once the device responds."); } catch (e) { toastError(e); }
   });
@@ -326,6 +331,10 @@ async function configuration(host, d, data, { udid, reload }) {
   });
 }
 
+function showAll(n, noun) {
+  return n > 15 ? html`<div class="pager"><span>Showing 15 of ${plural(n, noun)}</span><button type="button" class="btn btn-sm" data-showall>Show all</button></div>` : "";
+}
+
 export async function showCommand(uuid) {
   const c = await api.get(`/api/commands/${encodeURIComponent(uuid)}`);
   const cmd = c.command;
@@ -340,7 +349,6 @@ export async function showCommand(uuid) {
     ${c.result ? html`<h3 style="margin-top:16px">Device response</h3><pre class="code">${JSON.stringify(c.result, null, 2)}</pre>` : ""}`,
     actions: [
       ...(["Queued", "Sent", "NotNow"].includes(cmd.status) && can("act") ? [{ id: "cancel", label: "Cancel command", kind: "danger", onClick: async () => { await api.del(`/api/commands/${encodeURIComponent(uuid)}`); toast("Command canceled"); } }] : []),
-      { id: "c", label: "Close" },
     ] });
 }
 

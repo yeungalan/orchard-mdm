@@ -90,7 +90,7 @@ async function push(host, ctx) {
   const st = await api.get("/api/apns");
   const c = st.certificate;
   const admin = can("admin");
-  host.innerHTML = html`<div class="stack" style="max-width:900px">
+  host.innerHTML = html`<div class="stack" style="max-width:960px">
     <section class="panel"><div class="panel-head"><h2>Push certificate</h2>${c.configured ? (c.days_left > 30 ? html`<span class="chip chip-good">Active</span>` : html`<span class="chip chip-bad">Expires in ${c.days_left} days</span>`) : html`<span class="chip chip-warn">Not set up</span>`}</div>
       <div class="panel-pad">${c.configured ? html`<dl class="kv"><dt>Topic</dt><dd class="ident">${c.topic}</dd><dt>Expires</dt><dd>${fmtDate(c.not_after)} (${c.days_left} days)</dd><dt>Apple Account used</dt><dd>${c.apple_id || html`<span class="muted">Not recorded. Note it, you'll need the same account to renew.</span>`}</dd></dl>
         ${admin ? html`<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="test">Send a test push</button></div>` : ""}`
@@ -171,9 +171,9 @@ function uploadCert(ctx, allowTopicChange = false) {
 
 async function vpp(host, ctx) {
   const res = await api.get("/api/vpp/tokens");
-  host.innerHTML = html`<section class="panel" style="max-width:900px"><div class="panel-head"><h2>Content tokens</h2>${can("admin") ? html`<button class="btn btn-sm btn-primary" id="add">Add token</button>` : ""}</div>
+  host.innerHTML = html`<section class="panel" style="max-width:960px"><div class="panel-head"><h2>Content tokens</h2>${can("admin") ? html`<button class="btn btn-sm btn-primary" id="add">Add token</button>` : ""}</div>
     ${res.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Location</th><th class="num">Apps</th><th>Expires</th><th>Last sync</th><th></th></tr></thead><tbody>
-      ${res.items.map((t) => html`<tr><td><strong>${t.name}</strong><span class="cell-sub">${t.location_name || t.org_name}</span>${t.last_error ? html`<span class="cell-sub" style="color:var(--danger)">${t.last_error}</span>` : ""}</td>
+      ${res.items.map((t) => html`<tr><td><strong>${t.name}</strong><span class="cell-sub">${t.location_name || t.org_name}</span>${t.last_error ? html`<span class="err-text" title="${t.last_error}">${t.last_error}</span>` : ""}</td>
         <td class="num">${t.asset_count}</td><td>${fmtDate(t.exp_date)}</td><td>${ago(t.last_sync)}</td>
         <td class="right nowrap">${can("manage") ? html`<button class="btn btn-sm" data-sync="${t.id}">Sync</button>` : ""} ${can("admin") ? html`<button class="btn btn-sm btn-ghost link-danger" data-del="${t.id}">Remove</button>` : ""}</td></tr>`)}
     </tbody></table></div>` : emptyState("No Apps and Books token", "Download a content token in Apple Business Manager (Preferences → Payments and Billing) to install purchased apps without Apple Accounts.")}</section>`.s;
@@ -203,10 +203,10 @@ async function users(host, ctx) {
     ${res.items.map((u) => html`<tr><td><strong>${u.display_name || u.username}</strong><span class="cell-sub">${u.username}${u.email ? ", " + u.email : ""}</span></td>
       <td>${u.role}${u.disabled ? html` <span class="chip chip-unknown">Disabled</span>` : ""}</td><td>${u.last_login ? ago(u.last_login) : "Never"}</td>
       <td class="right"><button class="btn btn-sm btn-ghost" data-edit="${u.id}">Edit</button></td></tr>`)}</tbody></table></div></section>
-    <section class="panel panel-pad" style="max-width:960px;margin-top:16px"><h3>Change your password</h3><form id="pw" class="inline-fields">
+    <section class="panel panel-pad" style="max-width:960px;margin-top:16px"><h3>Change your password</h3><form id="pw" class="pw-form">
       <label class="field"><span>Current password</span><input type="password" name="current" autocomplete="current-password" required></label>
       <label class="field"><span>New password</span><input type="password" name="new" minlength="10" autocomplete="new-password" required></label>
-      <div class="field"><span class="field-label">&nbsp;</span><button class="btn" type="submit">Change password</button></div></form></section>`.s;
+      <button class="btn" type="submit">Change password</button></form></section>`.s;
   const edit = (u) => {
     const isNew = !u;
     u = u || { username: "", display_name: "", email: "", role: "operator", disabled: false };
@@ -246,7 +246,7 @@ async function apikeys(host, ctx) {
     <p class="hint panel-pad" style="margin:0 0 -6px">Use keys for scripts and integrations: <span class="kbd">Authorization: Bearer orch_…</span> on any <span class="kbd">/api</span> endpoint.</p>
     ${res.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Key</th><th>Role</th><th>Last used</th><th>Expires</th><th></th></tr></thead><tbody>
       ${res.items.map((k) => html`<tr><td><strong>${k.name}</strong><span class="cell-sub">by ${k.created_by}</span></td><td class="ident">${k.prefix}…</td><td>${k.role}</td><td>${k.last_used ? ago(k.last_used) : "Never"}</td>
-        <td>${k.expires_at ? fmtDate(k.expires_at) : "Never"}</td><td class="right"><button class="link-btn link-danger" data-del="${k.id}">Revoke</button></td></tr>`)}</tbody></table></div>`
+        <td>${k.expires_at ? fmtDate(k.expires_at) : "Never"}</td><td class="right"><button class="btn btn-sm btn-ghost link-danger" data-del="${k.id}">Revoke</button></td></tr>`)}</tbody></table></div>`
       : html`<p class="hint panel-pad">No keys yet.</p>`}</section>`.s;
   $("#add", host).addEventListener("click", () => modal({ title: "Create API key",
     body: html`<label class="field"><span>Name</span><input type="text" name="n" required placeholder="e.g. Inventory export"></label>
@@ -279,8 +279,8 @@ async function webhooks(host, ctx) {
     <p class="hint panel-pad" style="margin:0 0 -6px">Orchard POSTs JSON to these URLs. Verify the <span class="kbd">X-Orchard-Signature</span> header (HMAC-SHA256 of the body with the webhook secret).</p>
     ${res.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Webhook</th><th>Events</th><th>Last delivery</th><th></th></tr></thead><tbody>
       ${res.items.map((w) => html`<tr><td><strong>${w.name}</strong>${w.enabled ? "" : html` <span class="chip chip-unknown">Off</span>`}<span class="cell-sub ident" style="margin-left:0">${w.url}</span></td>
-        <td>${w.events.length ? w.events.length + " events" : "All events"}</td>
-        <td>${w.last_delivery ? html`${ago(w.last_delivery)} ${w.last_error ? html`<span class="chip chip-bad">${w.last_error}</span>` : html`<span class="chip chip-good">${w.last_status}</span>`}` : "Never"}</td>
+        <td class="nowrap">${w.events.length ? plural(w.events.length, "event") : "All events"}</td>
+        <td>${w.last_delivery ? html`<span class="row" style="gap:8px">${w.last_error ? html`<span class="chip chip-bad">Failed</span>` : html`<span class="chip chip-good">${w.last_status}</span>`}${ago(w.last_delivery)}</span>${w.last_error ? html`<span class="err-text" title="${w.last_error}">${w.last_error}</span>` : ""}` : "Never"}</td>
         <td class="right nowrap">${can("admin") ? html`<button class="btn btn-sm" data-test="${w.id}">Test</button> <button class="btn btn-sm btn-ghost" data-edit="${w.id}">Edit</button>` : ""}</td></tr>`)}</tbody></table></div>`
       : html`<p class="hint panel-pad">No webhooks yet.</p>`}</section>`.s;
   const edit = (w) => {
@@ -309,12 +309,19 @@ async function webhooks(host, ctx) {
   }));
 }
 
+const uptime = (s) => s >= 86400 ? plural(Math.floor(s / 86400), "day") : s >= 3600 ? plural(Math.floor(s / 3600), "hour") : plural(Math.max(1, Math.floor(s / 60)), "minute");
+const VIA = { token: "Enrollment link", account: "Work account sign-in", ade: "Automated enrollment", manual: "Profile download", renew: "Renewal" };
+const viaLabel = (ref) => {
+  const [kind] = String(ref || "").split(":");
+  return VIA[kind] || ref || "—";
+};
+
 async function about(host) {
   const [sys, certs] = await Promise.all([api.get("/api/system"), api.get("/api/pki/issued?limit=50")]);
   const up = sys.uptime_seconds;
   host.innerHTML = html`<div class="grid-2" style="max-width:1100px">
     <section class="panel"><div class="panel-head"><h2>Server</h2></div><div class="panel-pad"><dl class="kv">
-      <dt>Version</dt><dd>${sys.version}</dd><dt>Go</dt><dd>${sys.go_version}</dd><dt>Running for</dt><dd>${up > 86400 ? Math.floor(up / 86400) + " days" : Math.floor(up / 3600) + " hours"}</dd>
+      <dt>Version</dt><dd>${sys.version}</dd><dt>Go</dt><dd>${sys.go_version}</dd><dt>Running for</dt><dd>${uptime(up)}</dd>
       <dt>Public URL</dt><dd class="ident">${sys.public_url || "—"}</dd><dt>TLS</dt><dd>${{ acme: "Let's Encrypt (automatic)", files: "Certificate files", proxy: "Terminated by a reverse proxy" }[sys.tls_mode]}</dd>
       <dt>Database</dt><dd>${bytes(sys.db_size)} <span class="hint ident">${sys.data_dir}</span></dd>
       <dt>Remote wipe</dt><dd>Not supported by design. The enrollment profile withholds the erase right and erase commands are refused.</dd></dl></div></section>
@@ -323,7 +330,7 @@ async function about(host) {
   </div>
   <h2 class="section">Recently issued device identities</h2>
   <section class="panel" style="max-width:1100px">${certs.items.length ? html`<div class="table-wrap"><table class="table"><thead><tr><th>Subject</th><th>Issued</th><th>Expires</th><th>Device</th><th>Via</th></tr></thead><tbody>
-    ${certs.items.map((c) => html`<tr><td>${c.subject}</td><td>${fmtTime(c.created_at)}</td><td>${fmtDate(c.not_after)}</td><td>${c.device_id ? html`<a href="#/devices/${encodeURIComponent(c.device_id)}">View</a>` : html`<span class="muted">Not enrolled</span>`}</td><td>${c.ref}</td></tr>`)}</tbody></table></div>`
+    ${certs.items.map((c) => html`<tr><td>${c.subject}</td><td>${fmtTime(c.created_at)}</td><td>${fmtDate(c.not_after)}</td><td>${c.device_id ? html`<a href="#/devices/${encodeURIComponent(c.device_id)}">${c.device_name || "View device"}</a>` : html`<span class="muted">Not enrolled</span>`}</td><td>${viaLabel(c.ref)}</td></tr>`)}</tbody></table></div>`
     : html`<p class="hint panel-pad" style="margin:0">No identities issued yet.</p>`}</section>`.s;
   $("#ca", host).addEventListener("click", () => api.download("GET", "/api/pki/ca", undefined, "orchard-ca.pem").catch(toastError));
 }

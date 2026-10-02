@@ -64,16 +64,196 @@ console and REST API.
 
 ## Screenshots
 
-| | |
-|---|---|
-| ![Everything assigned to a device, with delivery state, compliance verdict and declaration status](docs/images/config.png) | ![Battery and free-storage history with the networks a device has used](docs/images/telemetry.png) |
-| Device configuration: assignments, compliance and Declarative Management status | Battery, storage and network history |
-| ![Last known position and location history](docs/images/location.png) | ![Profile builder editing a Wi-Fi payload](docs/images/profile.png) |
-| Location (Lost Mode or companion app) | Profile builder |
-| ![A personal iPad enrolled with User Enrollment: work account shown, device identifiers hidden](docs/images/byod-device.jpg) | <img src="docs/images/byod-signin.jpg" width="300" alt="Work account sign-in page explaining what the organization can and can't see"> |
-| BYOD device enrolled with User Enrollment | Work account sign-in, as people see it in Settings |
+The console, the Company Portal and the enrollment pages, from a demo fleet of 14 simulated devices. Click any image for full size.
 
-<p align="center"><img src="docs/images/portal.jpg" width="300" alt="Company Portal on a phone: device status, compliance reasons and optional apps"><br>Company Portal, as users see it on their device</p>
+<details open>
+<summary><b>Devices</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/devices.jpg"><img src="docs/images/devices.jpg" alt="Device list with filters, bulk actions and CSV export"></a><br><sub>Device list with filters, bulk actions and CSV export</sub></td>
+<td width="50%" valign="top"><a href="docs/images/device.jpg"><img src="docs/images/device.jpg" alt="Device overview: identity, status, security and network"></a><br><sub>Device overview: identity, status, security and network</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/device-telemetry.jpg"><img src="docs/images/device-telemetry.jpg" alt="Battery and free-storage history, networks seen, recent samples"></a><br><sub>Battery and free-storage history, networks seen, recent samples</sub></td>
+<td width="50%" valign="top"><a href="docs/images/device-location.jpg"><img src="docs/images/device-location.jpg" alt="Location history (Lost Mode or the companion app)"></a><br><sub>Location history (Lost Mode or the companion app)</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/device-lost-mode.jpg"><img src="docs/images/device-lost-mode.jpg" alt="A device in Lost Mode"></a><br><sub>A device in Lost Mode</sub></td>
+<td width="50%" valign="top"><a href="docs/images/device-configuration.jpg"><img src="docs/images/device-configuration.jpg" alt="Everything assigned to a device: delivery state, compliance and declarations"></a><br><sub>Everything assigned to a device: delivery state, compliance and declarations</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/device-apps.jpg"><img src="docs/images/device-apps.jpg" alt="Installed apps, with managed apps marked"></a><br><sub>Installed apps, with managed apps marked</sub></td>
+<td width="50%" valign="top"><a href="docs/images/device-profiles.jpg"><img src="docs/images/device-profiles.jpg" alt="Installed configuration profiles"></a><br><sub>Installed configuration profiles</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/device-certificates.jpg"><img src="docs/images/device-certificates.jpg" alt="Certificates on the device"></a><br><sub>Certificates on the device</sub></td>
+<td width="50%" valign="top"><a href="docs/images/device-commands.jpg"><img src="docs/images/device-commands.jpg" alt="Commands sent to the device"></a><br><sub>Commands sent to the device</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/device-activity.jpg"><img src="docs/images/device-activity.jpg" alt="Device activity timeline"></a><br><sub>Device activity timeline</sub></td>
+<td width="50%" valign="top"><a href="docs/images/manage-device.png"><img src="docs/images/manage-device.png" alt="Manage: wake, sample, re-apply, recovery codes, remove management (no wipe)"></a><br><sub>Manage: wake, sample, re-apply, recovery codes, remove management (no wipe)</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/send-command.png"><img src="docs/images/send-command.png" alt="Send command: 50+ commands grouped by purpose"></a><br><sub>Send command: 50+ commands grouped by purpose</sub></td>
+<td width="50%" valign="top"><a href="docs/images/command-form.png"><img src="docs/images/command-form.png" alt="Command options, e.g. a lock screen message and phone number"></a><br><sub>Command options, e.g. a lock screen message and phone number</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/command-detail.png"><img src="docs/images/command-detail.png" alt="Command detail with the exact request and the device response"></a><br><sub>Command detail with the exact request and the device response</sub></td>
+<td width="50%" valign="top"><a href="docs/images/command-queue.jpg"><img src="docs/images/command-queue.jpg" alt="Fleet-wide command queue"></a><br><sub>Fleet-wide command queue</sub></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>Groups</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/groups.jpg"><img src="docs/images/groups.jpg" alt="Static, dynamic and built-in groups"></a><br><sub>Static, dynamic and built-in groups</sub></td>
+<td width="50%" valign="top"><a href="docs/images/group-static.jpg"><img src="docs/images/group-static.jpg" alt="A static group with its members and assignments"></a><br><sub>A static group with its members and assignments</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/group-dynamic.jpg"><img src="docs/images/group-dynamic.jpg" alt="A dynamic group and its rules"></a><br><sub>A dynamic group and its rules</sub></td>
+<td width="50%" valign="top"><a href="docs/images/group-new.png"><img src="docs/images/group-new.png" alt="Creating a group: static or rule-based"></a><br><sub>Creating a group: static or rule-based</sub></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>Configuration profiles</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/profiles.jpg"><img src="docs/images/profiles.jpg" alt="Profiles with their payloads and deployment state"></a><br><sub>Profiles with their payloads and deployment state</sub></td>
+<td width="50%" valign="top"><a href="docs/images/profile-wifi.jpg"><img src="docs/images/profile-wifi.jpg" alt="Profile builder: Wi-Fi with 802.1X"></a><br><sub>Profile builder: Wi-Fi with 802.1X</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/profile-restrictions.jpg"><img src="docs/images/profile-restrictions.jpg" alt="Passcode and 90+ restrictions, with supervised-only keys labeled"></a><br><sub>Passcode and 90+ restrictions, with supervised-only keys labeled</sub></td>
+<td width="50%" valign="top"><a href="docs/images/add-payload.png"><img src="docs/images/add-payload.png" alt="Payload picker; labels show supervised-only and not-on-BYOD payloads"></a><br><sub>Payload picker; labels show supervised-only and not-on-BYOD payloads</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/profile-new.jpg"><img src="docs/images/profile-new.jpg" alt="A new, empty profile"></a><br><sub>A new, empty profile</sub></td>
+<td width="50%" valign="top"><a href="docs/images/profile-dark.jpg"><img src="docs/images/profile-dark.jpg" alt="Profile builder in dark mode"></a><br><sub>Profile builder in dark mode</sub></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>Apps, declarations and compliance</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/apps.jpg"><img src="docs/images/apps.jpg" alt="App catalog and Apps and Books licenses"></a><br><sub>App catalog and Apps and Books licenses</sub></td>
+<td width="50%" valign="top"><a href="docs/images/app.jpg"><img src="docs/images/app.jpg" alt="App settings, managed app configuration, assignments and deployment"></a><br><sub>App settings, managed app configuration, assignments and deployment</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/app-store-search.png"><img src="docs/images/app-store-search.png" alt="Adding an app from the App Store"></a><br><sub>Adding an app from the App Store</sub></td>
+<td width="50%" valign="top"><a href="docs/images/declarations.jpg"><img src="docs/images/declarations.jpg" alt="Declarative Device Management declarations"></a><br><sub>Declarative Device Management declarations</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/declaration.jpg"><img src="docs/images/declaration.jpg" alt="Editing a declaration and its assignments"></a><br><sub>Editing a declaration and its assignments</sub></td>
+<td width="50%" valign="top"><a href="docs/images/compliance.jpg"><img src="docs/images/compliance.jpg" alt="Compliance overview and devices that need attention"></a><br><sub>Compliance overview and devices that need attention</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/compliance-policy.jpg"><img src="docs/images/compliance-policy.jpg" alt="A compliance policy: OS, security, storage, apps, grace period and auto-lock"></a><br><sub>A compliance policy: OS, security, storage, apps, grace period and auto-lock</sub></td>
+<td width="50%" valign="top"><a href="docs/images/dashboard-dark.png"><img src="docs/images/dashboard-dark.png" alt="Overview in dark mode"></a><br><sub>Overview in dark mode</sub></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>Enrollment</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/enrollment.jpg"><img src="docs/images/enrollment.jpg" alt="Enrollment: server readiness, enrollment links, work account sign-in and addresses"></a><br><sub>Enrollment: server readiness, enrollment links, work account sign-in and addresses</sub></td>
+<td width="50%" valign="top"><a href="docs/images/enrollment-share.png"><img src="docs/images/enrollment-share.png" alt="Sharing an enrollment link as a QR code"></a><br><sub>Sharing an enrollment link as a QR code</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/work-account-settings.png"><img src="docs/images/work-account-settings.png" alt="Work account sign-in (account-driven enrollment) settings"></a><br><sub>Work account sign-in (account-driven enrollment) settings</sub></td>
+<td width="50%" valign="top"><a href="docs/images/ade.jpg"><img src="docs/images/ade.jpg" alt="Automated Device Enrollment with Apple Business Manager"></a><br><sub>Automated Device Enrollment with Apple Business Manager</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/enroll-page.jpg"><img src="docs/images/enroll-page.jpg" alt="The enrollment page on a computer, with a QR code for the device"></a><br><sub>The enrollment page on a computer, with a QR code for the device</sub></td>
+<td width="50%" valign="top"><a href="docs/images/enrollment-dark.jpg"><img src="docs/images/enrollment-dark.jpg" alt="Enrollment in dark mode"></a><br><sub>Enrollment in dark mode</sub></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>BYOD (User Enrollment)</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/byod-device.jpg"><img src="docs/images/byod-device.jpg" alt="A personal iPhone: work account shown, device identifiers hidden"></a><br><sub>A personal iPhone: work account shown, device identifiers hidden</sub></td>
+<td width="50%" valign="top"><a href="docs/images/byod-configuration.jpg"><img src="docs/images/byod-configuration.jpg" alt="Payloads iOS rejects on personal devices are marked not applicable"></a><br><sub>Payloads iOS rejects on personal devices are marked not applicable</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/byod-commands.png"><img src="docs/images/byod-commands.png" alt="Only commands iOS allows on User Enrollment are offered"></a><br><sub>Only commands iOS allows on User Enrollment are offered</sub></td>
+<td width="50%" valign="top"><a href="docs/images/device-dark.jpg"><img src="docs/images/device-dark.jpg" alt="Device page in dark mode"></a><br><sub>Device page in dark mode</sub></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>Activity and settings</b></summary>
+<br>
+
+<table>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/activity.jpg"><img src="docs/images/activity.jpg" alt="Device activity across the fleet"></a><br><sub>Device activity across the fleet</sub></td>
+<td width="50%" valign="top"><a href="docs/images/audit-log.jpg"><img src="docs/images/audit-log.jpg" alt="Audit log with readable details and links to what changed"></a><br><sub>Audit log with readable details and links to what changed</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/settings-general.jpg"><img src="docs/images/settings-general.jpg" alt="General settings: organization, support contacts, enrollment"></a><br><sub>General settings: organization, support contacts, enrollment</sub></td>
+<td width="50%" valign="top"><a href="docs/images/settings-schedule.jpg"><img src="docs/images/settings-schedule.jpg" alt="Schedules and data retention"></a><br><sub>Schedules and data retention</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/settings-push.jpg"><img src="docs/images/settings-push.jpg" alt="APNs push certificate status and renewal"></a><br><sub>APNs push certificate status and renewal</sub></td>
+<td width="50%" valign="top"><a href="docs/images/settings-apps-and-books.jpg"><img src="docs/images/settings-apps-and-books.jpg" alt="Apps and Books content tokens"></a><br><sub>Apps and Books content tokens</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/settings-administrators.jpg"><img src="docs/images/settings-administrators.jpg" alt="Administrators and roles"></a><br><sub>Administrators and roles</sub></td>
+<td width="50%" valign="top"><a href="docs/images/settings-api-keys.jpg"><img src="docs/images/settings-api-keys.jpg" alt="API keys"></a><br><sub>API keys</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/settings-webhooks.jpg"><img src="docs/images/settings-webhooks.jpg" alt="Signed webhooks with delivery status"></a><br><sub>Signed webhooks with delivery status</sub></td>
+<td width="50%" valign="top"><a href="docs/images/settings-about.jpg"><img src="docs/images/settings-about.jpg" alt="Server details, device identity CA and issued certificates"></a><br><sub>Server details, device identity CA and issued certificates</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/sign-in.png"><img src="docs/images/sign-in.png" alt="Console sign-in"></a><br><sub>Console sign-in</sub></td>
+<td width="50%" valign="top"><a href="docs/images/setup.png"><img src="docs/images/setup.png" alt="First-run setup on a new server"></a><br><sub>First-run setup on a new server</sub></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><a href="docs/images/device-telemetry-dark.jpg"><img src="docs/images/device-telemetry-dark.jpg" alt="Battery and network history in dark mode"></a><br><sub>Battery and network history in dark mode</sub></td>
+<td width="50%" valign="top"><a href="docs/images/mobile-menu.png"><img src="docs/images/mobile-menu.png" alt="Console navigation on a phone"></a><br><sub>Console navigation on a phone</sub></td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><b>On phones: Company Portal, sign-in and the console</b></summary>
+<br>
+
+<table><tr><td align="center" valign="top"><a href="docs/images/portal.jpg"><img src="docs/images/portal.jpg" width="230" alt="Company Portal"></a><br><sub>Company Portal</sub></td><td align="center" valign="top"><a href="docs/images/portal-dark.jpg"><img src="docs/images/portal-dark.jpg" width="230" alt="Company Portal, dark"></a><br><sub>Company Portal, dark</sub></td><td align="center" valign="top"><a href="docs/images/byod-signin.jpg"><img src="docs/images/byod-signin.jpg" width="230" alt="Work account sign-in"></a><br><sub>Work account sign-in</sub></td><td align="center" valign="top"><a href="docs/images/enroll-code.jpg"><img src="docs/images/enroll-code.jpg" width="230" alt="Enrollment code page"></a><br><sub>Enrollment code page</sub></td></tr></table>
+
+<table><tr><td align="center" valign="top"><a href="docs/images/mobile-dashboard.jpg"><img src="docs/images/mobile-dashboard.jpg" width="230" alt="Console overview"></a><br><sub>Console overview</sub></td><td align="center" valign="top"><a href="docs/images/mobile-devices.jpg"><img src="docs/images/mobile-devices.jpg" width="230" alt="Device list"></a><br><sub>Device list</sub></td><td align="center" valign="top"><a href="docs/images/mobile-device.jpg"><img src="docs/images/mobile-device.jpg" width="230" alt="Device page"></a><br><sub>Device page</sub></td></tr></table>
+
+</details>
 
 ## No remote wipe
 
