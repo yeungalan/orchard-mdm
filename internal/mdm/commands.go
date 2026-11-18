@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yeungalan/orchard-mdm/internal/ddm"
 	"github.com/yeungalan/orchard-mdm/internal/store"
 	"howett.net/plist"
 )
@@ -639,8 +640,7 @@ var Catalog = []*Spec{
 
 // SyncTokens returns the DeclarativeManagement Data blob.
 func SyncTokens(token string) []byte {
-	b, _ := json.Marshal(map[string]any{"SyncTokens": map[string]any{"DeclarationsToken": token}})
-	return b
+	return ddm.SyncTokensJSON(token)
 }
 
 var catalogIndex = func() map[string]*Spec {
